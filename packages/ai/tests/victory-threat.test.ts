@@ -14,6 +14,7 @@ describe('victory recognition', () => {
       agents,
       (g) => {
         const st = g.getState();
+        if (st.phase === 'gameover') return true;
         if (st.phase !== 'play') return false;
         const actor = activeActor(st)!;
         const me = st.players.find((p) => p.id === actor)!;
@@ -31,7 +32,7 @@ describe('victory recognition', () => {
             return true;
           }
         }
-        return st.phase === 'gameover';
+        return false;
       },
       4000,
     );
@@ -51,6 +52,7 @@ describe('victory recognition', () => {
       agents,
       (g) => {
         const st = g.getState();
+        if (st.phase === 'gameover') return true;
         if (st.phase !== 'play') return false;
         for (const p of st.players) {
           const vp = victoryPoints(p, st).total;
@@ -62,7 +64,7 @@ describe('victory recognition', () => {
             return true;
           }
         }
-        return st.phase === 'gameover';
+        return false;
       },
       5000,
     );

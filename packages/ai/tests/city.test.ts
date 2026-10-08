@@ -16,6 +16,7 @@ describe('city evaluation', () => {
         agents,
         (g) => {
           const st = g.getState();
+          if (st.phase === 'gameover') return true;
           if (st.phase !== 'play') return false;
           const actor = activeActor(st)!;
           const agent = agents[Number(actor.slice(1)) - 1]!;
@@ -31,7 +32,7 @@ describe('city evaluation', () => {
             g.dispatch(cmd); // actually build it so we can verify placement
             return true;
           }
-          return st.phase === 'gameover';
+          return false;
         },
         4000,
       );

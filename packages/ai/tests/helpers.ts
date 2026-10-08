@@ -2,7 +2,8 @@
  * Shared test helpers: build games, drive them to interesting states.
  */
 import { Game, legalCommands, type GameState } from '@isleforge/game-engine';
-import { createBot, type BotAgent } from '../src/agent.js';
+import { createBot } from '../src/agent.js';
+import type { BotAgent } from '../src/types.js';
 import type { Difficulty, Personality } from '../src/types.js';
 
 export function newGame(seed = 42, n = 4): Game {
