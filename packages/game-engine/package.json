@@ -1,0 +1,30 @@
+{
+  "description": "Deterministic, event-sourced game engine for the Isleforge base game (Archipelago). Zero runtime dependencies; no DOM, no framework.",
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "name": "@isleforge/game-engine",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "demo": "npx tsx src/demo.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json"
+  },
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "version": "0.1.0"
+}
