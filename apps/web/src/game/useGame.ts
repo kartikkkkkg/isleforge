@@ -139,5 +139,9 @@ export function useIsleforgeGame(
 
   const clearError = useCallback(() => setError(null), []);
 
-  return { game, state, seats, dispatch, error, clearError, newGame, isBot, humanId };
+  // Stable identity: consumers (e.g. the bot-runner effect) depend on this.
+  return useMemo(
+    () => ({ game, state, seats, dispatch, error, clearError, newGame, isBot, humanId }),
+    [game, state, seats, dispatch, error, clearError, newGame, isBot, humanId],
+  );
 }

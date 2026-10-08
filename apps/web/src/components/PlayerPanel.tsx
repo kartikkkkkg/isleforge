@@ -9,6 +9,7 @@ import {
 } from '@isleforge/game-engine';
 import { Avatar, VpBadge } from './ui';
 import { playerCssColor } from './Board';
+import { activeActor } from '../game/useGame';
 
 interface PlayerPanelProps {
   player: PlayerState;
@@ -26,7 +27,8 @@ export const PlayerPanel = memo(function PlayerPanel({
   compact,
 }: PlayerPanelProps) {
   const vp = victoryPoints(player, state);
-  const isTurn = state.currentPlayerId === player.id && state.phase !== 'gameover';
+  const actorId = activeActor(state) ?? state.currentPlayerId;
+  const isTurn = actorId === player.id && state.phase !== 'gameover';
   const color = playerCssColor(player.color);
   const resourceTotal = (Object.values(player.resources) as number[]).reduce(
     (a, b) => a + (b ?? 0),

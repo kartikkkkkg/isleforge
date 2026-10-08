@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import type { GameState } from '@isleforge/game-engine';
+import { activeActor } from '../game/useGame';
 
 const PHASE_LABEL: Record<string, string> = {
   setup: 'Setup',
@@ -20,7 +21,9 @@ interface TopBarProps {
 }
 
 export const TopBar = memo(function TopBar({ state, playerName, onOpenMenu, onOpenRules }: TopBarProps) {
-  const turnName = state.phase === 'gameover' ? '—' : playerName(state.currentPlayerId);
+  // During setup the engine keeps currentPlayerId stale; the setup cursor is authoritative.
+  const actorId = activeActor(state) ?? state.currentPlayerId;
+  const turnName = state.phase === 'gameover' ? '—' : playerName(actorId);
   return (
     <header className="if-topbar">
       <div className="if-brand">
