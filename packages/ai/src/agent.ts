@@ -152,26 +152,39 @@ class Agent implements BotAgent {
   }
 
   /** Deterministic RNG for one decision: same (state, config) → same stream. */
-  private rngFor(state: GameState, playerId: string): RandomSource {
-    const h = hashStr(`${this.baseSeed}:${playerId}:${state.events.length}`);
+  private rngFor(eventCount: number, playerId: string): RandomSource {
+    const h = hashStr(`${this.baseSeed}:${playerId}:${eventCount}`);
     return createRng(h);
   }
 
   chooseAction(state: GameState, playerId: string): Command | null {
     const t0 = Date.now();
+    const eventCount = state.events.length;
+    // Auto-reset the per-turn safety counter when the turn changes, so the
+    // agent can never get stuck even if the caller forgets notifyTurnStarted.
+    const turnKey = state.phase === 'setup' && state.setup
+      ? `setup:${state.setup.cursor}`
+      : `${state.turnNumber}:${playerId}:${state.phase}`;
+    if (this._turnOwner !== turnKey) {
+      this._turnOwner = turnKey;
+      this._actionsThisTurn = 0;
+    }
     // Masked view: opponent dev-card types are hidden, like for a human.
-    const view = publicGameState(state, playerId);
+    // Drop the event log before cloning — probes don't read it and it's the
+    // largest part of the state.
+    const view = publicGameState({ ...state, events: [] }, playerId);
     // Probing on the masked view is safe: legality only depends on the
-    // acting player's own (unmasked) cards/resources/position.
-    const legal = legalCommands(view as unknown as GameState, playerId).filter(
-      (c) => c.type !== 'RESIGN' && c.type !== 'TRADE_PROPOSE',
-    );
+    // acting player's own (unmasked) cards/resources/position. Skipping
+    // TRADE_PROPOSE enumeration (120 probes the M3 AI never initiates).
+    const legal = legalCommands(view as unknown as GameState, playerId, {
+      skipTradePropose: true,
+    }).filter((c) => c.type !== 'RESIGN');
     if (legal.length === 0) {
       this._lastDecision = null;
       return null;
     }
 
-    const rng = this.rngFor(state, playerId);
+    const rng = this.rngFor(eventCount, playerId);
     const ctx = buildEvalContext(view, playerId, this.weights);
     const diff: Difficulty = this.config.difficulty;
 
@@ -196,7 +209,7 @@ class Agent implements BotAgent {
         break;
       case 'play':
         goal = this.pickGoal(ctx);
-        scored = this.scorePlay(state, view, playerId, legal, ctx, rng);
+        scored = this.scorePlay(state, view, playerId, legal, ctx);
         break;
       default:
         scored = [];
@@ -334,7 +347,6 @@ class Agent implements BotAgent {
     playerId: string,
     legal: Command[],
     ctx: EvalContext,
-    rng: RandomSource,
   ): ScoredAction[] {
     // 1. Immediate victory always wins.
     for (const cmd of legal) {
@@ -394,13 +406,8 @@ class Agent implements BotAgent {
         default:
           s = { score: -50, reasons: [] };
       }
-      // Gate bank trades behind willingness (avoids trade spam).
-      if (cmd.type === 'TRADE_BANK' && s.score > 0) {
-        const gate = 2 + (1 - ctx.weights.tradeWillingness) * 14 + rng.next() * 4;
-        if (s.score < gate && this.config.difficulty !== 'expert') {
-          s = { score: -1, reasons: [{ label: 'trade not worth it', points: -1 }] };
-        }
-      }
+      // Bank trades are scored on their merits; the "nothing worthwhile"
+      // fallback below keeps the AI from churning.
       out.push({ command: cmd, ...s });
     }
     return out;

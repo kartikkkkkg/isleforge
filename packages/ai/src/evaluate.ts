@@ -391,36 +391,63 @@ export function evaluateBankTrade(
   const w = ctx.weights;
   const reasons: EvalReason[] = [];
   const ratio = bankTradeRatio(state as GameState, playerId, give);
-
-  // What does the received resource unlock? Value it at marginal utility,
-  // with a bonus when it completes a build we can afford right after.
   const me = meOf(state, playerId);
+
+  // Can't trade what we don't have.
+  if (me.resources[give] < ratio) {
+    return { score: -100, reasons: [r('cannot afford the trade', -100)] };
+  }
+
   const after: ResourceCount = { ...me.resources };
   after[give] -= ratio;
   after[receive] += 1;
 
-  let unlockBonus = 0;
+  const BUILD_VALUE: Record<string, number> = {
+    city: 22,
+    settlement: 20,
+    road: 11,
+    devCard: 13,
+  };
+  const canAfford = (res: ResourceCount, b: string): boolean => {
+    const cost = COSTS[b as keyof typeof COSTS];
+    return RESOURCES.every((x) => res[x] >= cost[x]);
+  };
+
+  // The core question: does this trade unlock a build I couldn't do before?
+  let unlock = 0;
+  let unlockWhat = '';
   for (const b of Object.keys(COSTS) as (keyof typeof COSTS)[]) {
-    const cost = COSTS[b];
-    let afford = true;
-    for (const res of RESOURCES) if (after[res] < cost[res]) afford = false;
-    if (afford) {
-      // Which build would this be? Rough value by type.
-      const bv = b === 'city' ? 14 : b === 'settlement' ? 12 : b === 'road' ? 6 : 8;
-      unlockBonus = Math.max(unlockBonus, bv);
+    const before = canAfford(me.resources, b);
+    if (!before && canAfford(after, b)) {
+      const v = (BUILD_VALUE[b] ?? 8) * (0.5 + w.tradeWillingness * 0.9);
+      if (v > unlock) {
+        unlock = v;
+        unlockWhat = b;
+      }
     }
   }
 
-  const gain = ctx.marginal[receive] * 8 + unlockBonus;
-  const cost = ctx.marginal[give] * ratio * 4;
-  let score = (gain - cost) * (0.4 + w.tradeWillingness);
-  reasons.push(r(`${ratio}:1 ${give}→${receive}`, score));
-  if (unlockBonus > 0) reasons.push(r('unlocks a build', unlockBonus * 0.4));
+  // Giving away scarce production hurts; receiving scarce helps.
+  const scarcityGive = ctx.production[give] <= 0.01 ? 6 : 0;
+  const scarcityGet = ctx.production[receive] <= 0.01 ? 4 : 0;
 
-  // Never trade away the last of a scarce resource cheaply.
-  if (me.resources[give] <= ratio && ctx.production[give] <= 0.01) {
-    score -= 10;
-    reasons.push(r('last of a scarce resource', -10));
+  let score = unlock + scarcityGet - scarcityGive;
+  if (unlock > 0) reasons.push(r(`unlocks ${unlockWhat}`, unlock));
+  if (scarcityGet > 0) reasons.push(r(`scarce ${receive}`, scarcityGet));
+  if (scarcityGive > 0) reasons.push(r(`gives scarce ${give}`, -scarcityGive));
+
+  // Never trade away the last of a resource we produce none of, unless it
+  // unlocks something big.
+  if (me.resources[give] <= ratio && ctx.production[give] <= 0.01 && unlock < 15) {
+    score -= 12;
+    reasons.push(r('last of a scarce resource', -12));
+  }
+
+  // Small nudge for improving balance even without an immediate unlock.
+  if (unlock === 0) {
+    const balance = (ctx.marginal[receive] - ctx.marginal[give]) * 2;
+    score += balance;
+    if (balance !== 0) reasons.push(r('rebalance', balance));
   }
   return { score, reasons };
 }

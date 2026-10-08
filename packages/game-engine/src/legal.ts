@@ -69,7 +69,16 @@ export function discardCombinations(hand: ResourceCount, need: number, cap = 500
   return out;
 }
 
-export function legalCommands(state: GameState, playerId: string): Command[] {
+export interface LegalCommandsOptions {
+  /** Skip enumerating TRADE_PROPOSE candidates (120 probes the AI never uses). Default false. */
+  skipTradePropose?: boolean;
+}
+
+export function legalCommands(
+  state: GameState,
+  playerId: string,
+  opts: LegalCommandsOptions = {},
+): Command[] {
   const cmds: Command[] = [];
   const me = state.players.find((p) => p.id === playerId);
   if (!me || me.resigned || state.phase === 'gameover') return cmds;
@@ -168,6 +177,7 @@ export function legalCommands(state: GameState, playerId: string): Command[] {
         }
         for (const other of activePlayers(state)) {
           if (other.id === playerId) continue;
+          if (opts.skipTradePropose) continue;
           for (const give of RESOURCES) {
             for (const receive of RESOURCES) {
               if (give === receive) continue;

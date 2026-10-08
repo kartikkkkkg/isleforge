@@ -111,7 +111,7 @@ export function simulateGame(
     const agent = agents.get(actor)!;
     agent.notifyTurnStarted(actor);
     const t0 = Date.now();
-    const cmd = agent.chooseAction(game.getState(), actor);
+    const cmd = agent.chooseAction(state, actor);
     const dt = Date.now() - t0;
     if (dt > maxDecisionMs) maxDecisionMs = dt;
     if (!cmd) break; // stuck — should not happen
