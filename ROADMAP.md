@@ -8,7 +8,7 @@
 |---|---|---|
 | 1 | Local deterministic game engine | ✅ Done 2026-10-08 — `packages/game-engine`, 100 tests, demo-verified |
 | 2 | Game UI | ✅ Done 2026-10-08 — `apps/web`, playable vs 3 bots, 18 UI tests + E2E |
-| 3 | AI opponents | ⬜ EASY/NORMAL/HARD/EXPERT via `legalCommands`; personalities later (Aggressive, Defensive, Builder, Trader, Opportunist, Balanced) |
+| 3 | AI opponents | ✅ Done 2026-10-08 — `packages/ai`: 4 difficulties × 5 personalities, simulation-validated |
 | 4 | Authentication | ⬜ Email/Google/Discord/Apple; profiles (username, avatar, rating, stats) |
 | 5 | Realtime multiplayer | ⬜ Authoritative WebSocket server wrapping `Game.dispatch`; server owns state, dice, trades, victory |
 | 6 | Rooms/lobbies | ⬜ Create/join via code/link, private/public, slots, bots, ready state, settings, map/expansion/player-count selection |

@@ -26,6 +26,31 @@ copying any proprietary source code, artwork, logos, trademarks, or text.
    complete until tests pass, docs are updated, the app runs, and the working
    state is committed.
 
+## Milestone 3 — AI opponents ✅ COMPLETE (2026-10-08)
+
+Strategic AI in `packages/ai` (`@isleforge/ai` — no React, zero runtime deps
+beyond the engine):
+
+- `BotAgent` interface: `chooseAction(state, playerId)` returns one legal
+  engine command; masked public view (no hidden info); per-decision seeded
+  RNG — same (state, config) → same action
+- 4 difficulties (Easy/Normal/Hard/Expert — noise + depth + Expert 1-ply
+  lookahead) × 5 personalities (Balanced/Aggressive/Builder/Trader/
+  Opportunist — real weight differences, not seed changes)
+- Modular evaluators with reasons: settlement, road, city, dev cards,
+  bank/port trades (scored on what they unlock), raider/steal, discard,
+  threat assessment, immediate-win detection
+- Safety: per-turn action cap (auto-reset), END_TURN fallback, never throws
+- Simulation harness: AI-vs-AI, no React; 100 seeded games, 100% completion,
+  0 illegal commands (see packages/ai/AI_ARCHITECTURE.md)
+- UI: menu config (2–3 AI, difficulty, personality/varied), "X is thinking…"
+  indicator, `?debugAI=1` developer panel; human-vs-AI fully playable
+- Engine: `legalCommands` gains `skipTradePropose` enumeration option
+  (no rule change); all 100 M1 tests still pass
+
+Out of scope (later milestones): multiplayer, auth, matchmaking, ranked,
+replays UI, spectators, friends/chat backend, maps, expansions, modes.
+
 ## Milestone 2 — Game UI ✅ COMPLETE (2026-10-08)
 
 Playable browser game in `apps/web` (Vite + React + TS):

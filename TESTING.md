@@ -7,6 +7,13 @@ cd packages/game-engine
 npm test          # vitest, 100 tests
 npm run typecheck # strict TS over src + tests
 npm run demo      # CLI smoke: full random games, replay-verified
+
+cd ../ai
+npm test          # vitest, AI unit/strategy/simulation tests
+npm run simulate -- 100 normal   # 100-game AI-vs-AI acceptance run
+
+cd ../../apps/web
+npm test          # vitest, 21 UI tests
 ```
 
 ## Strategy

@@ -82,7 +82,10 @@ replay-verifies every finished game.
   generators plug in beside `archipelago-classic`.
 - **Expansions (M13):** commands/events are data; new modules add command types
   + `planCommand` branches + event handlers without touching the core loop.
-- **Bots (M3):** `legalCommands(state, playerId)` is the bot decision interface.
+- **Bots (M3):** `legalCommands(state, playerId)` is the bot decision interface —
+  implemented in `packages/ai` (`@isleforge/ai`): 4 difficulties × 5
+  personalities, modular evaluators, deterministic seeded decisions, AI-vs-AI
+  simulation harness. See `packages/ai/AI_ARCHITECTURE.md`.
 - **Server (M5):** `Game.dispatch` *is* the authoritative move handler; the
   server will wrap it with auth, rooms, and broadcast.
 - **Replays (M9):** `replayEvents` + `serializeEvents` are the replay backend.
