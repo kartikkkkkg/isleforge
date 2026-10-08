@@ -28,6 +28,7 @@ describe('city evaluation', () => {
               settlements: [...p.settlements],
               playerId: actor,
             };
+            g.dispatch(cmd); // actually build it so we can verify placement
             return true;
           }
           return st.phase === 'gameover';
