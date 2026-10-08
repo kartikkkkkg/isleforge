@@ -14,6 +14,13 @@ npm run simulate -- 100 normal   # 100-game AI-vs-AI acceptance run
 
 cd ../../apps/web
 npm test          # vitest, 21 UI tests
+
+cd ../server
+npm test          # vitest: rooms, game, integration, reconnect, security
+npm run dev       # local server on :8080 (also: npm run dev:server from root)
+
+cd ../../packages/protocol
+npm test          # vitest, 18 protocol validation tests
 ```
 
 ## Strategy
@@ -95,3 +102,30 @@ npm run e2e         # Playwright: critical flows (desktop + mobile viewports)
   blocked by a flaky CDN in the dev sandbox, so E2E runs in CI / on first
   `npx playwright install`.)
 - Engine's 100/100 tests still pass unchanged.
+
+## Multiplayer testing (M4)
+
+- **Protocol validation** (`packages/protocol`): every inbound shape —
+  envelope, versions, room codes, names, commands, chat, reconnect — accepted
+  or rejected with the right error code (18 tests).
+- **Room lifecycle** (`apps/server/tests/rooms.test.ts`): create/join/leave,
+  ready, AI seats, host migration, start gating, room close.
+- **ServerGame** (`apps/server/tests/game.test.ts`): authoritative dispatch,
+  idempotent `commandId`s, anti-spoofing, out-of-turn rejection, AI setup
+  cascade, per-viewer event masking, masked snapshots.
+- **Full-game integration** (`tests/integration.test.ts`): 4 bot-driven
+  WebSocket clients play complete games to `GAME_ENDED`; asserts gapless
+  monotonic event seqs from 0, client state == server authoritative masked
+  state (JSON-equal), hidden dev-card types never leak, and a 2-human +
+  2-server-AI variant.
+- **Reconnect** (`tests/reconnect.test.ts`): mid-game drop → `RECONNECT`
+  replays missed events gaplessly → snapshot → resume to `GAME_ENDED`;
+  unknown sessions rejected; AI takeover keeps the game moving past the
+  grace period.
+- **Security** (`tests/security.test.ts`): malformed JSON, unknown types,
+  wrong versions, oversized frames, spoofed playerIds, out-of-turn commands,
+  duplicate `commandId`s (executed once), command/chat spam rate limits,
+  seat hijack without session.
+- **Manual multi-browser**: `npm run dev:server` + `npm run dev:web`, open
+  2–4 windows (or LAN devices via `?server=ws://<host>:8080`), create/join by
+  code, ready, start — verified during M4 development.

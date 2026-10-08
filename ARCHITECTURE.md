@@ -6,8 +6,11 @@
 isleforge/
   packages/
     game-engine/      # M1 ✅ — deterministic rules engine
+    ai/               # M3 ✅ — AI opponents (difficulties × personalities)
+    protocol/         # M4 ✅ — versioned WS protocol + runtime validators
   apps/
-    web/              # M2 ✅ — browser game UI (Vite + React + TS)
+    web/              # M2 ✅ / M4 ✅ — browser game UI (Vite + React + TS)
+    server/           # M4 ✅ — authoritative multiplayer server (Node + ws)
 ```
 
 `packages/game-engine` has **zero runtime dependencies** and imports nothing
@@ -17,6 +20,32 @@ browser, on the server, and in bots.
 
 `apps/web` consumes the engine as a workspace dependency and adds no game
 rules of its own — see UI_ARCHITECTURE.md for the full UI design.
+
+
+## Multiplayer server (M4)
+
+`apps/server` is authoritative: it owns one `Game` per room and executes every
+command through `Game.dispatch()` — no game rules are duplicated server-side.
+Browsers send `GAME_COMMAND`s over the versioned `@isleforge/protocol`
+WebSocket contract and render masked snapshots (`GAME_STATE`) + events
+(`GAME_EVENT`). Sessions (`sessionId`) survive disconnects; a grace period
+with server-AI takeover keeps games moving. Full design:
+`MULTIPLAYER_ARCHITECTURE.md`; wire format: `PROTOCOL.md`.
+
+| Module | Responsibility |
+|---|---|
+| `server.ts` | `IsleforgeServer`: ws wiring, message routing, heartbeats, reconnect grace |
+| `rooms.ts` | `RoomManager`: codes, seats, ready, host, AI fill, start gating |
+| `sessions.ts` | `SessionManager`: `sessionId` → (room, player) bindings |
+| `game.ts` | `ServerGame`: authoritative engine, AI cascade, idempotency, event masking |
+| `roomCode.ts` | Human-friendly room codes (`A7K9P`) |
+| `ratelimit.ts` | Per-category flood protection |
+| `protocol` pkg | Message types + runtime validators (shared with the web client) |
+
+The web client consumes the same `GameScreen` through the `GameApiLike`
+interface: `useIsleforgeGame` (local) and `useMultiplayerGame` (online) are
+interchangeable adapters — local game, online game, and (later)
+replay/spectator share components.
 
 ## Engine module map
 

@@ -18,13 +18,43 @@ copying any proprietary source code, artwork, logos, trademarks, or text.
 2. **The engine is independent from the frontend.** A pure, deterministic,
    event-sourced game engine (`@isleforge/game-engine`) owns all rules. The UI,
    bots, and (later) the network server are all clients of the engine.
-3. **Never trust the client.** Every command is validated server-side (later:
-   on the authoritative server); the client only requests actions.
+3. **Never trust the client.** Every command is validated on the authoritative
+   server; the client only requests actions.
 4. **Event sourcing from day one.** Every game is a replayable event log, which
    powers replays, spectators, history, analytics, anti-cheat, and debugging.
-5. **Incremental milestones.** 18 milestones, in strict order. No milestone is
+5. **Incremental milestones.** 17 milestones, in strict order. No milestone is
    complete until tests pass, docs are updated, the app runs, and the working
    state is committed.
+
+## Milestone 4 — Realtime multiplayer infrastructure ✅ COMPLETE (2026-10-09)
+
+Authoritative WebSocket game server (`apps/server`, Node + `ws`) wrapping
+`Game.dispatch` — the server owns state, dice, trades, and victory; browsers
+are untrusted clients on the versioned `@isleforge/protocol` contract
+(`PROTOCOL.md`). Full design: `MULTIPLAYER_ARCHITECTURE.md`.
+
+Delivered:
+
+- versioned protocol (v1) with runtime validation of every inbound message
+  (malformed / oversized / wrong-version / unknown-type rejected)
+- rooms with human-friendly codes (`A7K9P`), 3–4 seats, host, ready state,
+  AI fill (difficulty/personality), host migration, start gating
+  (2+ humans, all ready, seats filled)
+- `ServerGame`: one authoritative engine per room; idempotent `commandId`s;
+  monotonic event seqs from 0 (genesis `GAME_CREATED` broadcast)
+- hidden-information masking per viewer (snapshots via `publicView`,
+  `CARD_PURCHASED` types and bystander steal details masked in events)
+- reconnect with session ids, missed-event replay, configurable grace period,
+  server-AI takeover so games never stall, ws + protocol heartbeats
+- server-side AI seats through the same dispatch pipeline (incl.
+  `shouldAcceptTrade` auto-answers for player trades)
+- rate limiting (room/command/chat/reconnect), typed errors, anti-cheat by
+  construction (clients send commands, never state)
+- protocol-level game chat (200 chars, rate-limited)
+- web client: `useMultiplayerGame` adapter behind the shared `GameApiLike`
+  interface (same `GameScreen` for local + online), `OnlineLobby`,
+  connection indicator, chat wired into `ChatPanel`
+- no public matchmaking, accounts, or production deployment (later milestones)
 
 ## Milestone 3 — AI opponents ✅ COMPLETE (2026-10-08)
 
