@@ -12,10 +12,23 @@ import {
   type PlayerColor,
 } from '@isleforge/game-engine';
 
+import type { Difficulty, Personality } from '@isleforge/ai';
+
 export interface Seat {
   name: string;
   color: PlayerColor;
   isBot: boolean;
+  /** AI configuration (bots only). Defaults: normal / balanced. */
+  difficulty?: Difficulty;
+  personality?: Personality;
+}
+
+export interface AiSetup {
+  /** 2 or 3 (engine supports 3–4 players total, so 1 AI is not possible). */
+  count: 2 | 3;
+  difficulty: Difficulty;
+  /** 'varied' assigns a rotating personality per seat. */
+  personality: Personality | 'varied';
 }
 
 const toEnginePlayers = (seats: Seat[]) =>
@@ -23,22 +36,49 @@ const toEnginePlayers = (seats: Seat[]) =>
 
 export const HUMAN_SEAT: Seat = { name: 'Skipper', color: 'tide', isBot: false };
 
-const DEMO_BOTS: Seat[] = [
-  { name: 'Coral', color: 'ember', isBot: true },
-  { name: 'Marina', color: 'moss', isBot: true },
-  { name: 'Reef', color: 'dune', isBot: true },
+const BOT_NAMES: { name: string; color: PlayerColor }[] = [
+  { name: 'Coral', color: 'ember' },
+  { name: 'Marina', color: 'moss' },
+  { name: 'Reef', color: 'dune' },
 ];
 
-export function buildSeats(humanName: string, autopilot: boolean): Seat[] {
+const PERSONALITY_ROTATION: Personality[] = [
+  'balanced',
+  'aggressive',
+  'builder',
+  'trader',
+  'opportunist',
+];
+
+export function buildSeats(
+  humanName: string,
+  autopilot: boolean,
+  ai?: AiSetup,
+): Seat[] {
+  const setup: AiSetup = ai ?? { count: 3, difficulty: 'normal', personality: 'varied' };
+  const mkBot = (i: number): Seat => {
+    const base = BOT_NAMES[i % BOT_NAMES.length]!;
+    return {
+      ...base,
+      isBot: true,
+      difficulty: setup.difficulty,
+      personality:
+        setup.personality === 'varied'
+          ? PERSONALITY_ROTATION[i % PERSONALITY_ROTATION.length]!
+          : setup.personality,
+    };
+  };
   if (autopilot) {
     return [
-      { name: 'Coral', color: 'ember', isBot: true },
-      { name: 'Marina', color: 'tide', isBot: true },
-      { name: 'Reef', color: 'moss', isBot: true },
-      { name: 'Pearl', color: 'dune', isBot: true },
+      { name: 'Coral', color: 'ember', isBot: true, difficulty: 'normal', personality: 'balanced' },
+      { name: 'Marina', color: 'tide', isBot: true, difficulty: 'normal', personality: 'aggressive' },
+      { name: 'Reef', color: 'moss', isBot: true, difficulty: 'normal', personality: 'builder' },
+      { name: 'Pearl', color: 'dune', isBot: true, difficulty: 'normal', personality: 'trader' },
     ];
   }
-  return [{ ...HUMAN_SEAT, name: humanName || 'Skipper' }, ...DEMO_BOTS];
+  const bots: Seat[] = [];
+  for (let i = 0; i < setup.count; i++) bots.push(mkBot(i));
+  return [{ ...HUMAN_SEAT, name: humanName || 'Skipper' }, ...bots];
 }
 
 /** Who must act right now: setup cursor, a discarder, or the current player. */

@@ -1,1 +1,36 @@
-{"dependencies":{"@isleforge/game-engine":"0.1.0","react":"^18.3.1","react-dom":"^18.3.1"},"description":"Isleforge browser game UI (Milestone 2). React + Vite; all rules live in @isleforge/game-engine.","devDependencies":{"@playwright/test":"^1.49.1","@testing-library/jest-dom":"^6.6.3","@testing-library/react":"^16.1.0","@testing-library/user-event":"^14.5.2","@types/react":"^18.3.12","@types/react-dom":"^18.3.1","@vitejs/plugin-react":"^4.3.4","jsdom":"^25.0.1","typescript":"^5.6.3","vite":"^6.0.3","vitest":"^2.1.8"},"name":"@isleforge/web","private":true,"scripts":{"build":"tsc --noEmit -p tsconfig.json && vite build","dev":"vite","e2e":"playwright test","e2e:install":"playwright install chromium","preview":"vite preview","test":"vitest run","test:watch":"vitest","typecheck":"tsc --noEmit -p tsconfig.json"},"type":"module","version":"0.2.0"}
+{
+  "dependencies": {
+    "@isleforge/ai": "0.3.0",
+    "@isleforge/game-engine": "0.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "description": "Isleforge browser game UI (Milestone 3). React + Vite; all rules live in @isleforge/game-engine; AI in @isleforge/ai.",
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3",
+    "vitest": "^2.1.8"
+  },
+  "name": "@isleforge/web",
+  "private": true,
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "dev": "vite",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install chromium",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "type": "module",
+  "version": "0.2.0"
+}

@@ -13,7 +13,13 @@ import {
   activeActor,
   type Seat,
 } from '../game/useGame';
-import { chooseBotMove, botAcceptsTrade, createBotRng } from '../game/bot';
+import {
+  createBot,
+  shouldAcceptTrade,
+  type BotAgent,
+  type Difficulty,
+  type Personality,
+} from '@isleforge/ai';
 import { formatLog, type LogEntry } from '../game/log';
 import { GameBoard, playerCssColor, type BoardMode, type PlaceKind } from '../components/Board';
 import { TopBar } from '../components/TopBar';
@@ -41,14 +47,72 @@ type ModalKind =
   | 'embargo'
   | 'steal';
 
+/* Developer-only AI inspector (?debugAI=1). Never shown in normal play. */
+function AiDebugPanel({
+  getAgent,
+  playerId,
+}: {
+  getAgent: (id: string) => BotAgent | null;
+  playerId: string | null;
+}) {
+  const d = playerId ? getAgent(playerId)?.lastDecision : null;
+  if (!d) return null;
+  return (
+    <aside className="if-ai-debug" aria-label="AI debug panel">
+      <div className="if-ai-debug__head">
+        AI · {d.playerId} · {d.phase} · {d.elapsedMs}ms
+      </div>
+      <div className="if-ai-debug__goal">Goal: {d.goal}</div>
+      <ol className="if-ai-debug__cands">
+        {d.candidates.map((c) => (
+          <li key={c.label} className={c.label === d.selected ? 'if-ai-debug__sel' : ''}>
+            <span>{c.label}</span>
+            <b>{c.score.toFixed(1)}</b>
+          </li>
+        ))}
+      </ol>
+      <ul className="if-ai-debug__reasons">
+        {d.reasons.map((x, i) => (
+          <li key={i}>
+            {x.points >= 0 ? '+' : ''}
+            {x.points.toFixed(1)} {x.label}
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
+
 const qs = () => new URLSearchParams(window.location.search);
 const BOT_DELAY = qs().has('fast') ? 80 : 700;
+const DEBUG_AI = qs().has('debugAI');
 
 export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) {
   const api = useIsleforgeGame(seats, seed);
   const { state } = api;
   const humanId = api.humanId;
-  const botRng = useRef(createBotRng((seed ?? 1) * 7919 + 13));
+  /* One agent per bot seat (difficulty/personality from the menu). */
+  const agents = useRef(new Map<string, BotAgent>());
+  const getAgent = useCallback(
+    (playerId: string): BotAgent | null => {
+      const idx = Number(playerId.slice(1)) - 1;
+      const seat = seats[idx];
+      if (!seat?.isBot) return null;
+      let a = agents.current.get(playerId);
+      if (!a) {
+        a = createBot({
+          difficulty: (seat.difficulty ?? 'normal') as Difficulty,
+          personality: (seat.personality ?? 'balanced') as Personality,
+          seed: ((seed ?? 1) * 7919 + 13 + idx * 101) >>> 0,
+        });
+        agents.current.set(playerId, a);
+      }
+      return a;
+    },
+    [seats, seed],
+  );
+  const [thinkingId, setThinkingId] = useState<string | null>(null);
+  const [lastBotId, setLastBotId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalKind>(null);
   const [buildSelection, setBuildSelection] = useState<PlaceKind | null>(null);
   const [diceRolling, setDiceRolling] = useState(false);
@@ -111,11 +175,22 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
 
   /* ── bot runner ─────────────────────────────────────────────── */
   useEffect(() => {
-    if (state.phase === 'gameover') return;
+    if (state.phase === 'gameover') {
+      setThinkingId(null);
+      return;
+    }
     const actor = activeActor(state);
-    if (!actor || !api.isBot(actor)) return;
+    if (!actor || !api.isBot(actor)) {
+      setThinkingId(null);
+      return;
+    }
+    const agent = getAgent(actor);
+    if (!agent) return;
+    setThinkingId(actor);
     const t = setTimeout(() => {
-      const cmd = chooseBotMove(api.game.getState(), actor, botRng.current);
+      const cmd = agent.chooseAction(api.game.getState(), actor);
+      setThinkingId(null);
+      setLastBotId(actor);
       if (cmd) {
         const evs = dispatch(cmd);
         // Bots auto-answer incoming human trade proposals after a beat.
@@ -124,11 +199,16 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
             if (e.type === 'TRADE_PROPOSED' && api.isBot(e.data.toPlayerId)) {
               const tradeId = e.data.tradeId;
               const toId = e.data.toPlayerId;
+              const toAgent = getAgent(toId);
               setTimeout(() => {
                 const st = api.game.getState();
                 const tr = st.pendingTrades.find((x) => x.id === tradeId);
-                if (!tr) return;
-                const ok = botAcceptsTrade(tr.offer, tr.request, botRng.current);
+                if (!tr || !toAgent) return;
+                const ok = shouldAcceptTrade(st, toId, tr.offer, tr.request, {
+                  difficulty: toAgent.config.difficulty,
+                  personality: toAgent.config.personality,
+                  seed: (toAgent.config.seed ^ 0x51ab) >>> 0,
+                });
                 dispatch({
                   type: ok ? 'TRADE_ACCEPT' : 'TRADE_DECLINE',
                   playerId: toId,
@@ -140,8 +220,11 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
         }
       }
     }, BOT_DELAY);
-    return () => clearTimeout(t);
-  }, [state, api, dispatch]);
+    return () => {
+      clearTimeout(t);
+      // setThinkingId(null); — keep the indicator until the action lands
+    };
+  }, [state, api, dispatch, getAgent]);
 
   /* ── human legal commands (only computed on the human's turn) ─ */
   const actor = activeActor(state);
@@ -333,6 +416,15 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
         onOpenMenu={() => setModal('menu')}
         onOpenRules={() => setModal('rules')}
       />
+      {thinkingId && (
+        <div className="if-thinking" role="status" aria-live="polite">
+          <span className="if-thinking__dots" aria-hidden="true">
+            <i /><i /><i />
+          </span>
+          {playerName(thinkingId)} is thinking…
+        </div>
+      )}
+      {DEBUG_AI && <AiDebugPanel getAgent={getAgent} playerId={lastBotId} />}
 
       <div className="if-main">
         <aside className="if-sidecol if-sidecol--left" aria-label="Opponents">
@@ -421,8 +513,13 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
               setTimeout(() => {
                 const st = api.game.getState();
                 const tr = st.pendingTrades.find((x) => x.id === tradeId);
-                if (!tr) return;
-                const ok = botAcceptsTrade(tr.offer, tr.request, botRng.current);
+                const toAgent = getAgent(toId);
+                if (!tr || !toAgent) return;
+                const ok = shouldAcceptTrade(st, toId, tr.offer, tr.request, {
+                  difficulty: toAgent.config.difficulty,
+                  personality: toAgent.config.personality,
+                  seed: (toAgent.config.seed ^ 0x51ab) >>> 0,
+                });
                 dispatch({ type: ok ? 'TRADE_ACCEPT' : 'TRADE_DECLINE', playerId: toId, tradeId });
                 toast(ok ? `${playerName(toId)} accepted your trade.` : `${playerName(toId)} declined your trade.`);
               }, 900);

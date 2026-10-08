@@ -1,19 +1,77 @@
-/* MainMenu — title screen. Starts a local game (1 human + 3 bots)
-   or an AI battle (autopilot). */
+/* MainMenu — title screen. Configures and starts a local game
+   (1 human + 2–3 AI) or an AI battle (autopilot). */
 
 import { useState } from 'react';
+import type { Difficulty, Personality } from '@isleforge/ai';
 import { RulesModal } from '../components/MenuModals';
+import type { AiSetup } from '../game/useGame';
 
 interface MainMenuProps {
-  onStart: (opts: { name: string; seed?: number; autopilot: boolean }) => void;
+  onStart: (opts: {
+    name: string;
+    seed?: number;
+    autopilot: boolean;
+    ai: AiSetup;
+  }) => void;
+}
+
+const DIFFS: { v: Difficulty; label: string }[] = [
+  { v: 'easy', label: 'Easy' },
+  { v: 'normal', label: 'Normal' },
+  { v: 'hard', label: 'Hard' },
+  { v: 'expert', label: 'Expert' },
+];
+
+const PERSONAS: { v: Personality | 'varied'; label: string }[] = [
+  { v: 'varied', label: 'Varied' },
+  { v: 'balanced', label: 'Balanced' },
+  { v: 'aggressive', label: 'Aggressive' },
+  { v: 'builder', label: 'Builder' },
+  { v: 'trader', label: 'Trader' },
+  { v: 'opportunist', label: 'Opportunist' },
+];
+
+function Seg<T extends string | number>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { v: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="if-field">
+      <span className="if-field__label">{label}</span>
+      <div className="if-seg" role="group" aria-label={label}>
+        {options.map((o) => (
+          <button
+            key={String(o.v)}
+            type="button"
+            className={`if-seg__btn${o.v === value ? ' if-seg__btn--on' : ''}`}
+            aria-pressed={o.v === value}
+            onClick={() => onChange(o.v)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function MainMenu({ onStart }: MainMenuProps) {
   const [name, setName] = useState('Skipper');
   const [seedText, setSeedText] = useState('');
   const [showRules, setShowRules] = useState(false);
+  const [aiCount, setAiCount] = useState<2 | 3>(3);
+  const [difficulty, setDifficulty] = useState<Difficulty>('normal');
+  const [personality, setPersonality] = useState<Personality | 'varied'>('varied');
 
   const seed = seedText.trim() === '' ? undefined : Number(seedText) || undefined;
+  const ai: AiSetup = { count: aiCount, difficulty, personality };
 
   return (
     <div className="if-menu">
@@ -54,16 +112,39 @@ export function MainMenu({ onStart }: MainMenuProps) {
             aria-label="Island seed"
           />
         </label>
+
+        <details className="if-menu__ai" open>
+          <summary className="if-menu__ai-sum">AI opponents</summary>
+          <Seg
+            label="Rivals"
+            options={[
+              { v: 2 as const, label: '2 AI' },
+              { v: 3 as const, label: '3 AI' },
+            ]}
+            value={aiCount}
+            onChange={setAiCount}
+          />
+          <Seg label="Difficulty" options={DIFFS} value={difficulty} onChange={setDifficulty} />
+          <Seg
+            label="Personality"
+            options={PERSONAS}
+            value={personality}
+            onChange={setPersonality}
+          />
+        </details>
+
         <div className="if-menu__btns">
           <button
             className="if-btn if-btn--primary if-btn--lg"
-            onClick={() => onStart({ name: name.trim() || 'Skipper', seed, autopilot: false })}
+            onClick={() => onStart({ name: name.trim() || 'Skipper', seed, autopilot: false, ai })}
           >
-            Set Sail — Play vs 3 Bots
+            Set Sail — Play vs {aiCount} AI
           </button>
           <button
             className="if-btn if-btn--ghost"
-            onClick={() => onStart({ name: 'Spectator', seed, autopilot: true })}
+            onClick={() =>
+              onStart({ name: 'Spectator', seed, autopilot: true, ai })
+            }
           >
             Watch AI Battle
           </button>

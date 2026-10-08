@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { MainMenu } from './screens/MainMenu';
 import { GameScreen } from './screens/GameScreen';
-import { buildSeats, type Seat } from './game/useGame';
+import { buildSeats, type AiSetup, type Seat } from './game/useGame';
 import './styles/tokens.css';
 import './styles/app.css';
 import './styles/board.css';
@@ -13,6 +13,8 @@ interface Session {
   autopilot: boolean;
 }
 
+const DEFAULT_AI: AiSetup = { count: 3, difficulty: 'normal', personality: 'varied' };
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => {
     // Deep-link support: ?autopilot=1[&seed=N][&fast=1] boots straight into a game (E2E + demos).
@@ -22,7 +24,7 @@ export default function App() {
       const autopilot = q.get('autopilot') === '1';
       const seed = q.get('seed') ? Number(q.get('seed')) : undefined;
       return {
-        seats: buildSeats(q.get('name') ?? 'Skipper', autopilot),
+        seats: buildSeats(q.get('name') ?? 'Skipper', autopilot, DEFAULT_AI),
         seed,
         autopilot,
       };
@@ -31,9 +33,9 @@ export default function App() {
   });
 
   const start = useCallback(
-    (opts: { name: string; seed?: number; autopilot: boolean }) => {
+    (opts: { name: string; seed?: number; autopilot: boolean; ai: AiSetup }) => {
       setSession({
-        seats: buildSeats(opts.name, opts.autopilot),
+        seats: buildSeats(opts.name, opts.autopilot, opts.ai),
         seed: opts.seed,
         autopilot: opts.autopilot,
       });
