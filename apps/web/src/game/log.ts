@@ -117,7 +117,7 @@ export function formatLog(events: GameEvent[], state: GameState): LogEntry[] {
         });
         break;
       case 'RESOURCE_GRANTED': {
-        // Aggregate consecutive grants to the same player into one line.
+        // Aggregate consecutive grants to the same player for the same reason.
         const acc: Record<ResourceType, number> = {
           wood: 0,
           brick: 0,
@@ -129,6 +129,7 @@ export function formatLog(events: GameEvent[], state: GameState): LogEntry[] {
         while (j < events.length) {
           const ej = events[j]!;
           if (ej.type !== 'RESOURCE_GRANTED' || ej.playerId !== e.playerId) break;
+          if (ej.data.reason !== e.data.reason) break;
           acc[ej.data.resource] += ej.data.amount;
           j++;
         }
