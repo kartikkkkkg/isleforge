@@ -1,1 +1,17 @@
-{"description":"Isleforge — an original online strategy board-game platform. Monorepo.","engines":{"node":">=20"},"name":"isleforge","private":true,"scripts":{"build":"npm run build --workspaces --if-present","test":"npm run test --workspaces --if-present"},"version":"0.1.0","workspaces":["packages/*"]}
+{
+  "description": "Isleforge — an original online strategy board-game platform. Monorepo.",
+  "engines": {
+    "node": ">=20"
+  },
+  "name": "isleforge",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
+}

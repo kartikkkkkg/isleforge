@@ -1,0 +1,272 @@
+/* IsleForge board rendering. All geometry comes from the engine; this is paint only. */
+
+.if-board-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--if-radius-lg);
+  background:
+    radial-gradient(closest-side, rgba(20, 45, 58, 0.55), transparent 78%),
+    var(--if-water);
+  border: 1px solid var(--if-line-soft);
+  box-shadow: var(--if-shadow-md), inset 0 0 120px rgba(0, 0, 0, 0.5);
+}
+
+.if-board {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: manipulation;
+}
+
+.if-board text {
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ── Hex tiles ───────────────────────────────────────────────── */
+.if-hex {
+  stroke: rgba(8, 17, 20, 0.85);
+  stroke-width: 2.5;
+  transition: filter var(--if-dur-fast);
+}
+
+.if-hex--forest { fill: url(#if-grad-forest); }
+.if-hex--hills { fill: url(#if-grad-hills); }
+.if-hex--fields { fill: url(#if-grad-fields); }
+.if-hex--pasture { fill: url(#if-grad-pasture); }
+.if-hex--mountains { fill: url(#if-grad-mountains); }
+.if-hex--desert { fill: url(#if-grad-desert); }
+
+.if-hex-deco {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* number token */
+.if-token {
+  fill: #f4ead2;
+  stroke: #2a2118;
+  stroke-width: 2;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+
+.if-token__num {
+  font-family: var(--if-font-display);
+  font-weight: 800;
+  fill: #2a2118;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.if-token__num--hot {
+  fill: #b03a2a;
+}
+
+.if-token__pips {
+  fill: #2a2118;
+}
+
+.if-token__pips--hot {
+  fill: #b03a2a;
+}
+
+/* ── Roads / buildings ───────────────────────────────────────── */
+.if-road {
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.if-road--fresh {
+  animation: if-place-pop var(--if-dur-med) var(--if-ease);
+}
+
+.if-building {
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+
+.if-building--fresh {
+  animation: if-place-pop var(--if-dur-med) var(--if-ease);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes if-place-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ── Ports ───────────────────────────────────────────────────── */
+.if-port {
+  cursor: default;
+}
+
+.if-port__badge {
+  fill: #101d24;
+  stroke: var(--if-gold);
+  stroke-width: 2;
+}
+
+.if-port__label {
+  font-family: var(--if-font-display);
+  font-weight: 700;
+  fill: var(--if-gold-bright);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+/* ── Raider ──────────────────────────────────────────────────── */
+.if-raider {
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+}
+
+.if-raider--moving {
+  animation: if-raider-hop 0.6s var(--if-ease);
+}
+
+@keyframes if-raider-hop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-26px) scale(1.08);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Placement targets (engine-driven legality) ──────────────── */
+.if-target {
+  cursor: pointer;
+  outline: none;
+}
+
+.if-target__halo {
+  fill: none;
+  stroke: var(--if-gold-bright);
+  stroke-width: 3;
+  opacity: 0.55;
+  animation: if-halo-pulse 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.if-target:hover .if-target__halo,
+.if-target:focus-visible .if-target__halo {
+  opacity: 1;
+  stroke-width: 4.5;
+  animation: none;
+  filter: drop-shadow(0 0 6px rgba(240, 199, 106, 0.8));
+}
+
+@keyframes if-halo-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.if-board--placing {
+  cursor: crosshair;
+}
+
+.if-board--placing .if-hex {
+  cursor: crosshair;
+}
+
+/* raider target tiles */
+.if-raider-target {
+  cursor: pointer;
+}
+
+.if-raider-target .if-hex {
+  stroke: var(--if-bad);
+  stroke-width: 3.5;
+  animation: if-halo-pulse 1.4s ease-in-out infinite;
+}
+
+.if-raider-target:hover .if-hex {
+  filter: brightness(1.25);
+  animation: none;
+}
+
+/* ── Dice ────────────────────────────────────────────────────── */
+.if-dice {
+  display: inline-flex;
+  gap: var(--if-space-2);
+}
+
+.if-die {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #fbf5e4, #e8dcc0);
+  border: 2px solid #2a2118;
+  box-shadow: var(--if-shadow-md), inset 0 -4px 8px rgba(0, 0, 0, 0.12);
+  display: grid;
+  place-items: center;
+  font-family: var(--if-font-display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #2a2118;
+}
+
+.if-die--rolling {
+  animation: if-die-shake 0.55s linear;
+}
+
+@keyframes if-die-shake {
+  0% {
+    transform: rotate(0) translate(0, 0);
+  }
+  20% {
+    transform: rotate(-14deg) translate(-3px, 2px);
+  }
+  40% {
+    transform: rotate(10deg) translate(3px, -2px);
+  }
+  60% {
+    transform: rotate(-8deg) translate(-2px, -3px);
+  }
+  80% {
+    transform: rotate(6deg) translate(2px, 3px);
+  }
+  100% {
+    transform: rotate(0) translate(0, 0);
+  }
+}
+
+/* ── Resource tick animation ─────────────────────────────────── */
+.if-res-tick {
+  animation: if-res-pop var(--if-dur-med) var(--if-ease);
+}
+
+@keyframes if-res-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+    color: var(--if-gold-bright);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

@@ -1,0 +1,90 @@
+/* IsleForge design tokens — the single source of truth for visual language.
+   No arbitrary values elsewhere; consume these variables. */
+
+:root {
+  /* ── Palette: deep-sea night, parchment, forge-gold ─────────────── */
+  --if-bg-0: #081114;
+  --if-bg-1: #0d1b22;
+  --if-bg-2: #122730;
+  --if-bg-3: #18313c;
+
+  --if-panel: rgba(16, 33, 41, 0.88);
+  --if-panel-solid: #102129;
+  --if-panel-raised: #16303b;
+
+  --if-gold: #d8a94e;
+  --if-gold-bright: #f0c76a;
+  --if-gold-deep: #9a7326;
+
+  --if-text: #efe6d0;
+  --if-text-dim: #a9b6b0;
+  --if-text-faint: #71807b;
+
+  --if-line: rgba(216, 169, 78, 0.22);
+  --if-line-soft: rgba(239, 230, 208, 0.1);
+
+  --if-good: #6fd08c;
+  --if-bad: #e46a5e;
+  --if-info: #6fb7e4;
+
+  /* ── Terrain (original IsleForge palette) ───────────────────────── */
+  --if-forest: #2e7d4f;
+  --if-forest-deep: #1d5736;
+  --if-hills: #b25a33;
+  --if-hills-deep: #7e3d20;
+  --if-fields: #c9a227;
+  --if-fields-deep: #8f7418;
+  --if-pasture: #7fae5c;
+  --if-pasture-deep: #57793c;
+  --if-mountains: #6b7686;
+  --if-mountains-deep: #475061;
+  --if-desert: #d9c08a;
+  --if-desert-deep: #a8905c;
+  --if-water: #0e2a38;
+
+  /* ── Player colors (match @isleforge/game-engine PLAYER_COLORS) ─── */
+  --if-p-ember: #e4572e;
+  --if-p-tide: #3d8bfd;
+  --if-p-moss: #57b26a;
+  --if-p-dune: #d8a94e;
+  --if-p-orchid: #a86fd6;
+  --if-p-slate: #9aa4b2;
+
+  /* ── Typography ─────────────────────────────────────────────────── */
+  --if-font-display: 'Sora', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  --if-font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  --if-text-xs: 0.72rem;
+  --if-text-sm: 0.82rem;
+  --if-text-md: 0.95rem;
+  --if-text-lg: 1.12rem;
+  --if-text-xl: 1.4rem;
+  --if-text-2xl: 1.8rem;
+
+  /* ── Spacing / shape ────────────────────────────────────────────── */
+  --if-space-1: 4px;
+  --if-space-2: 8px;
+  --if-space-3: 12px;
+  --if-space-4: 16px;
+  --if-space-5: 24px;
+  --if-space-6: 32px;
+
+  --if-radius-sm: 8px;
+  --if-radius-md: 12px;
+  --if-radius-lg: 18px;
+  --if-radius-pill: 999px;
+
+  --if-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --if-shadow-md: 0 6px 24px rgba(0, 0, 0, 0.45);
+  --if-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --if-glow-gold: 0 0 18px rgba(216, 169, 78, 0.35);
+
+  /* ── Motion ─────────────────────────────────────────────────────── */
+  --if-ease: cubic-bezier(0.22, 0.9, 0.28, 1);
+  --if-dur-fast: 120ms;
+  --if-dur-med: 220ms;
+  --if-dur-slow: 420ms;
+
+  --if-topbar-h: 56px;
+  --if-deck-h: 148px;
+}
