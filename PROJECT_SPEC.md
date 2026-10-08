@@ -39,7 +39,8 @@ Playable browser game in `apps/web` (Vite + React + TS):
   `legalCommands()`; NOT the Milestone 3 AI), plus autopilot AI-battle mode
 - Design system (tokens → components → screens), responsive (desktop/tablet/
   mobile), keyboard-accessible, reduced-motion support
-- 18 UI tests passing (vitest/jsdom); Playwright E2E for critical flows
+- 21 UI tests passing (vitest/jsdom: unit, component, GameScreen integration,
+  full bot game); Playwright E2E suite for critical flows (runs in CI)
 - See UI_ARCHITECTURE.md
 
 Out of scope (later milestones): multiplayer, auth, matchmaking, ranked,

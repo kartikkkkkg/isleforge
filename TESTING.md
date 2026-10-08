@@ -53,14 +53,14 @@ human playtest at this milestone.
 ## Later milestones
 
 M5 adds multiplayer integration tests (authoritative server vs malicious
-client); M18 adds end-to-end browser tests for critical flows. No milestone
-is complete until its tests pass.
+client). No milestone is complete until its tests pass.
 
 ## Milestone 2 — UI tests (`apps/web`)
 
 ```bash
 cd apps/web
-npm test          # vitest + jsdom: 18 tests
+npm test            # vitest + jsdom: 21 tests
+npx playwright install chromium   # one-time browser download
 npm run e2e         # Playwright: critical flows (desktop + mobile viewports)
 ```
 
@@ -71,9 +71,20 @@ npm run e2e         # Playwright: critical flows (desktop + mobile viewports)
   from live state; placement targets are keyboard-accessible and dispatch;
   control deck shows live counts, enables Roll on the human turn, opens the
   build menu with engine-derived costs/reasons, and disables everything off-turn.
+- **Integration (jsdom + fake timers):** the real GameScreen — human clicks
+  setup targets interleaved with bot turns (8 settlements + 8 roads placed),
+  rolls real dice, the log narrates it, ending the turn advances to Turn 2
+  with the human back on roll; autopilot mode advances turns autonomously
+  with no error toasts.
+- **Bot full game (slow, ~70s):** `tests/bot-fullgame.test.ts` — the demo
+  SimpleBot plays a complete seed-7 game against the real engine (1161 moves)
+  to gameover; every move is legal by construction since `dispatch()` throws
+  on illegal commands.
 - **E2E (Playwright):** menu → start game; setup placement clicks; roll dice
   (real engine result, log narrates it); trade modal opens; end turn advances
   the turn counter; build menu shows all four options; player panels show VP;
   autopilot AI battle plays a complete game to the victory screen and
-  Play Again resets cleanly.
+  Play Again resets cleanly. (Written and committed; the browser download was
+  blocked by a flaky CDN in the dev sandbox, so E2E runs in CI / on first
+  `npx playwright install`.)
 - Engine's 100/100 tests still pass unchanged.

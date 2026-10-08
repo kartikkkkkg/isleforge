@@ -28,6 +28,12 @@ React Components (render snapshots; emit intents)
   (engine) feeds the build menu, placement targets, and action enablement.
   `buildOptions()` only *reads* affordability + legal counts to produce
   labels and disabled reasons.
+- **The active actor is derived, not read.** The engine does not update
+  `currentPlayerId` during setup (the setup cursor is authoritative), so the
+  UI resolves the actor via `activeActor(state)` — setup cursor, then pending
+  discarder, then `currentPlayerId`. TopBar, PlayerPanel, ControlDeck, and the
+  bot runner all use it. The returned `api` object is memoized so the bot
+  timer effect doesn't reset on unrelated re-renders.
 
 ## Component hierarchy
 
