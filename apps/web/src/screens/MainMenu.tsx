@@ -13,6 +13,7 @@ interface MainMenuProps {
     autopilot: boolean;
     ai: AiSetup;
   }) => void;
+  onPlayOnline: () => void;
 }
 
 const DIFFS: { v: Difficulty; label: string }[] = [
@@ -62,7 +63,7 @@ function Seg<T extends string | number>({
   );
 }
 
-export function MainMenu({ onStart }: MainMenuProps) {
+export function MainMenu({ onStart, onPlayOnline }: MainMenuProps) {
   const [name, setName] = useState('Skipper');
   const [seedText, setSeedText] = useState('');
   const [showRules, setShowRules] = useState(false);
@@ -148,12 +149,15 @@ export function MainMenu({ onStart }: MainMenuProps) {
           >
             Watch AI Battle
           </button>
+          <button className="if-btn if-btn--primary if-btn--lg" onClick={onPlayOnline}>
+            Play Online — Real Rivals
+          </button>
           <button className="if-btn if-btn--ghost" onClick={() => setShowRules}>
             How to Play
           </button>
         </div>
         <p className="if-menu__note">
-          Local play · No account needed · Multiplayer arrives in Milestone 5
+          Local play · Online multiplayer · No account needed
         </p>
       </div>
 

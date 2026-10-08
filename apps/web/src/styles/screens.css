@@ -1030,3 +1030,143 @@
   outline: 2px solid var(--if-gold-bright);
   outline-offset: 2px;
 }
+
+/* ── Multiplayer (Milestone 4) ─────────────────────────────────── */
+
+/* Connection indicator pill (game screen + lobby). */
+.if-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--if-panel);
+  border: 1px solid var(--if-line);
+  color: var(--if-text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.if-conn__dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #58c777;
+  box-shadow: 0 0 6px rgba(88, 199, 119, 0.8);
+  flex: none;
+}
+.if-conn--reconnecting .if-conn__dot {
+  background: #e8b93e;
+  box-shadow: 0 0 6px rgba(232, 185, 62, 0.8);
+  animation: if-conn-pulse 1s infinite ease-in-out;
+}
+.if-conn--disconnected .if-conn__dot {
+  background: #e05c5c;
+  box-shadow: 0 0 6px rgba(224, 92, 92, 0.8);
+}
+.if-conn__dot--on { background: #58c777; box-shadow: 0 0 6px rgba(88, 199, 119, 0.8); }
+.if-conn__dot--off { background: #e05c5c; box-shadow: none; }
+@keyframes if-conn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .if-conn--reconnecting .if-conn__dot { animation: none; }
+}
+/* Game-screen placement: below the thinking pill. */
+.if-app > .if-conn {
+  position: fixed;
+  top: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* Online lobby. */
+.if-lobby__connrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.if-lobby__server {
+  font-size: 12px;
+  color: var(--if-muted);
+  font-family: ui-monospace, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.if-lobby__me { font-size: 13px; color: var(--if-text); }
+.if-lobby__split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+@media (max-width: 560px) {
+  .if-lobby__split { grid-template-columns: 1fr; }
+}
+.if-lobby__col {
+  border: 1px solid var(--if-line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.if-lobby__h {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--if-muted);
+}
+.if-lobby__code {
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  font-family: ui-monospace, monospace;
+  text-align: center;
+  font-size: 18px;
+}
+.if-lobby__players {
+  list-style: none;
+  margin: 8px 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.if-lobby__player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--if-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.if-lobby__player--empty { opacity: 0.45; border-style: dashed; }
+.if-lobby__pname { flex: 1; font-size: 15px; }
+.if-lobby__host { color: var(--if-gold-bright); }
+.if-lobby__bot { color: var(--if-muted); font-size: 13px; }
+.if-lobby__ready {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--if-muted);
+}
+.if-lobby__ready--on { color: #58c777; }
+.if-lobby__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.if-lobby__airow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Chat messages (online). */
+.if-chat__msg { font-size: 13px; line-height: 1.45; margin-bottom: 6px; }
+.if-chat__msg b { color: var(--if-gold-bright); font-weight: 600; }

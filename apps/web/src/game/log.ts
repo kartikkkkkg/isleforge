@@ -169,7 +169,9 @@ export function formatLog(events: GameEvent[], state: GameState): LogEntry[] {
           text:
             e.data.resource && e.data.amount > 0
               ? `${who} stole ${e.data.amount} ${RES_NAME[e.data.resource]} from ${nameOf(state, e.data.fromPlayerId)}.`
-              : `${who} found nothing to steal from ${nameOf(state, e.data.fromPlayerId)}.`,
+              : e.data.amount > 0
+                ? `${who} stole from ${nameOf(state, e.data.fromPlayerId)}.`
+                : `${who} found nothing to steal from ${nameOf(state, e.data.fromPlayerId)}.`,
           kind: 'raider',
           playerId: e.playerId,
         });

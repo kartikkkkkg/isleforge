@@ -11,6 +11,7 @@ import {
 import {
   useIsleforgeGame,
   activeActor,
+  type GameApiLike,
   type Seat,
 } from '../game/useGame';
 import {
@@ -35,6 +36,10 @@ interface GameScreenProps {
   seed?: number | undefined;
   autopilot: boolean;
   onQuit: () => void;
+  /** When provided, GameScreen renders this instead of a local engine game. */
+  api?: GameApiLike;
+  /** Where "Play again" goes. Defaults to starting a fresh local game. */
+  onPlayAgain?: () => void;
 }
 
 type ModalKind =
@@ -87,10 +92,13 @@ const qs = () => new URLSearchParams(window.location.search);
 const BOT_DELAY = qs().has('fast') ? 80 : 700;
 const DEBUG_AI = qs().has('debugAI');
 
-export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) {
-  const api = useIsleforgeGame(seats, seed);
+export function GameScreen({ seats, seed, autopilot, onQuit, api: apiProp, onPlayAgain }: GameScreenProps) {
+  // Local adapter always exists; the multiplayer adapter is injected instead.
+  const localApi = useIsleforgeGame(seats, seed);
+  const api: GameApiLike = apiProp ?? localApi;
   const { state } = api;
   const humanId = api.humanId;
+  const isRemote = !!api.remote;
   /* One agent per bot seat (difficulty/personality from the menu). */
   const agents = useRef(new Map<string, BotAgent>());
   const getAgent = useCallback(
@@ -122,23 +130,27 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
   const startTime = useRef(Date.now());
   const toastId = useRef(1);
 
+  const seatById = useMemo(() => {
+    const m = new Map<string, Seat>();
+    seats.forEach((s, i) => m.set(s.playerId ?? `p${i + 1}`, s));
+    return m;
+  }, [seats]);
+
   const playerName = useCallback(
     (id: string | null | undefined): string => {
       if (!id) return '—';
-      const idx = Number(id.slice(1)) - 1;
-      return seats[idx]?.name ?? id;
+      return seatById.get(id)?.name ?? id;
     },
-    [seats],
+    [seatById],
   );
 
   const colorOf = useCallback(
     (playerId?: string): string => {
       if (!playerId) return '#9aa4b2';
-      const idx = Number(playerId.slice(1)) - 1;
-      const c = seats[idx]?.color ?? 'slate';
+      const c = seatById.get(playerId)?.color ?? 'slate';
       return playerCssColor(c as Parameters<typeof playerCssColor>[0]);
     },
-    [seats],
+    [seatById],
   );
 
   /* ── toasts ─────────────────────────────────────────────────── */
@@ -173,8 +185,12 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
     [api],
   );
 
-  /* ── bot runner ─────────────────────────────────────────────── */
+  /* ── bot runner (local only — the server runs AI seats online) ─── */
   useEffect(() => {
+    if (isRemote) {
+      setThinkingId(null);
+      return;
+    }
     if (state.phase === 'gameover') {
       setThinkingId(null);
       return;
@@ -188,7 +204,7 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
     if (!agent) return;
     setThinkingId(actor);
     const t = setTimeout(() => {
-      const cmd = agent.chooseAction(api.game.getState(), actor);
+      const cmd = agent.chooseAction(api.game!.getState(), actor);
       setThinkingId(null);
       setLastBotId(actor);
       if (cmd) {
@@ -201,7 +217,7 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
               const toId = e.data.toPlayerId;
               const toAgent = getAgent(toId);
               setTimeout(() => {
-                const st = api.game.getState();
+                const st = api.game!.getState();
                 const tr = st.pendingTrades.find((x) => x.id === tradeId);
                 if (!tr || !toAgent) return;
                 const ok = shouldAcceptTrade(st, toId, tr.offer, tr.request, {
@@ -224,7 +240,7 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
       clearTimeout(t);
       // setThinkingId(null); — keep the indicator until the action lands
     };
-  }, [state, api, dispatch, getAgent]);
+  }, [state, api, dispatch, getAgent, isRemote]);
 
   /* ── human legal commands (only computed on the human's turn) ─ */
   const actor = activeActor(state);
@@ -294,23 +310,29 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
               ? { type: 'BUILD_SETTLEMENT', playerId: humanId, cornerId: id }
               : { type: 'BUILD_CITY', playerId: humanId, cornerId: id };
       }
-      if (dispatch(cmd)) {
-        const st = api.game.getState();
-        const me = st.players.find((p) => p.id === humanId);
-        // Keep road placement active while Trailblazer free roads remain.
-        if (!(build === 'road' && (me?.freeRoads ?? 0) > 0)) setBuildSelection(null);
-      }
+      dispatch(cmd);
+      // Trailblazer free roads: the effect below keeps placement active while
+      // free roads remain (works for sync local + async remote dispatch).
     },
-    [dispatch, humanId, state.phase, api],
+    [dispatch, humanId, state.phase],
   );
+
+  /* Keep road placement active while Trailblazer free roads remain. */
+  useEffect(() => {
+    if (buildSelection === 'road' && humanId && state.phase === 'play') {
+      const me = state.players.find((p) => p.id === humanId);
+      if ((me?.freeRoads ?? 0) === 0) setBuildSelection(null);
+    }
+  }, [state, buildSelection, humanId]);
 
   const onMoveRaider = useCallback(
     (tileKey: string) => {
       if (!humanId) return;
-      const evs = dispatch({ type: 'MOVE_RAIDER', playerId: humanId, tileKey });
-      if (evs && api.game.getState().pendingSteal) setModal('steal');
+      dispatch({ type: 'MOVE_RAIDER', playerId: humanId, tileKey });
+      // The steal picker opens from state (showStealPicker) once the server
+      // confirms a steal is pending.
     },
-    [dispatch, humanId, api],
+    [dispatch, humanId],
   );
 
   const stealVictims = useMemo(() => {
@@ -340,7 +362,7 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
   const onPlayCard = useCallback(
     (cardUid: string) => {
       if (!humanId) return;
-      const me = api.game.getState().players.find((p) => p.id === humanId);
+      const me = state.players.find((p) => p.id === humanId);
       const card = me?.devCards.find((c) => c.uid === cardUid);
       if (!card) return;
       if (card.type === 'harvest') {
@@ -356,7 +378,7 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
       dispatch({ type: 'PLAY_DEVELOPMENT_CARD', playerId: humanId, cardUid });
       if (card.type === 'trailblazer') setBuildSelection('road');
     },
-    [dispatch, humanId, api],
+    [dispatch, humanId, state],
   );
 
   const onBankTrade = useCallback(
@@ -364,10 +386,12 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
       if (!humanId) return;
       for (let k = 0; k < times; k++) {
         const evs = dispatch({ type: 'TRADE_BANK', playerId: humanId, give, receive });
-        if (!evs) break;
+        // Local dispatch is sync: stop on the first failure. Remote dispatch
+        // is async: failures surface as error toasts instead.
+        if (!evs && !isRemote) break;
       }
     },
-    [dispatch, humanId],
+    [dispatch, humanId, isRemote],
   );
 
   /* ── derived UI state ───────────────────────────────────────── */
@@ -391,7 +415,7 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
 
   const newGame = useCallback(
     (seed?: number) => {
-      api.newGame(seed);
+      api.newGame?.(seed);
       setModal(null);
       setBuildSelection(null);
       setPendingCard(null);
@@ -399,6 +423,28 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
     },
     [api],
   );
+
+  /* Remote piece animations: derive from the server's recent event stream. */
+  const seenRemoteSeqs = useRef(new Set<number>());
+  useEffect(() => {
+    if (!isRemote || !api.recentEvents) return;
+    const fresh = new Set<string>();
+    for (const e of api.recentEvents) {
+      if (seenRemoteSeqs.current.has(e.seq)) continue;
+      seenRemoteSeqs.current.add(e.seq);
+      if (e.type === 'ROAD_BUILT') fresh.add(e.data.edgeId);
+      if (e.type === 'SETTLEMENT_BUILT' || e.type === 'CITY_BUILT') fresh.add(e.data.cornerId);
+      if (e.type === 'RAIDER_MOVED') fresh.add(e.data.toTileKey);
+    }
+    if (fresh.size > 0) {
+      setFreshIds(fresh);
+      const t = setTimeout(() => setFreshIds(new Set()), 700);
+      return () => clearTimeout(t);
+    }
+  }, [api.recentEvents, api, isRemote]);
+
+  /* Who's thinking: local bot runner sets thinkingId; online, any AI turn. */
+  const thinking = thinkingId ?? (isRemote && actor && api.isBot(actor) ? actor : null);
 
   return (
     <div className="if-app">
@@ -416,15 +462,30 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
         onOpenMenu={() => setModal('menu')}
         onOpenRules={() => setModal('rules')}
       />
-      {thinkingId && (
+      {thinking && (
         <div className="if-thinking" role="status" aria-live="polite">
           <span className="if-thinking__dots" aria-hidden="true">
             <i /><i /><i />
           </span>
-          {playerName(thinkingId)} is thinking…
+          {playerName(thinking)} is thinking…
         </div>
       )}
-      {DEBUG_AI && <AiDebugPanel getAgent={getAgent} playerId={lastBotId} />}
+      {isRemote && api.remoteInfo && (
+        <div
+          className={`if-conn if-conn--${api.remoteInfo.connection}`}
+          role="status"
+          aria-live="polite"
+          title={api.remoteInfo.roomCode ? `Room ${api.remoteInfo.roomCode}` : 'Online game'}
+        >
+          <span className="if-conn__dot" aria-hidden="true" />
+          {api.remoteInfo.connection === 'connected'
+            ? `Online · ${api.remoteInfo.roomCode ?? ''}`
+            : api.remoteInfo.connection === 'reconnecting'
+              ? 'Reconnecting…'
+              : 'Disconnected'}
+        </div>
+      )}
+      {DEBUG_AI && !isRemote && <AiDebugPanel getAgent={getAgent} playerId={lastBotId} />}
 
       <div className="if-main">
         <aside className="if-sidecol if-sidecol--left" aria-label="Opponents">
@@ -454,7 +515,7 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
           {human && (
             <PlayerPanel player={human} state={state} isHuman isBot={false} compact />
           )}
-          <LogChatTabs entries={entries} colorOf={colorOf} />
+          <LogChatTabs entries={entries} colorOf={colorOf} chat={api.chat} />
         </aside>
       </div>
 
@@ -492,7 +553,7 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
         <GameMenuModal
           onClose={() => setModal(null)}
           onOpenRules={() => setModal('rules')}
-          onRestart={() => newGame()}
+          {...(!isRemote ? { onRestart: () => newGame() } : {})}
           onResign={() => humanId && dispatch({ type: 'RESIGN', playerId: humanId })}
           onQuitToMenu={onQuit}
         />
@@ -506,12 +567,14 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
           onBankTrade={onBankTrade}
           onPropose={(toPlayerId, offer, request) => {
             const evs = dispatch({ type: 'TRADE_PROPOSE', playerId: humanId, toPlayerId, offer, request });
+            // Local bots auto-answer via the client agent; the server answers
+            // for AI seats in online games.
             const prop = evs?.find((e) => e.type === 'TRADE_PROPOSED');
-            if (prop && prop.type === 'TRADE_PROPOSED' && api.isBot(prop.data.toPlayerId)) {
+            if (!isRemote && prop && prop.type === 'TRADE_PROPOSED' && api.isBot(prop.data.toPlayerId)) {
               const tradeId = prop.data.tradeId;
               const toId = prop.data.toPlayerId;
               setTimeout(() => {
-                const st = api.game.getState();
+                const st = api.game!.getState();
                 const tr = st.pendingTrades.find((x) => x.id === tradeId);
                 const toAgent = getAgent(toId);
                 if (!tr || !toAgent) return;
@@ -582,7 +645,7 @@ export function GameScreen({ seats, seed, autopilot, onQuit }: GameScreenProps) 
           state={state}
           playerName={playerName}
           durationMs={Date.now() - startTime.current}
-          onPlayAgain={() => newGame()}
+          onPlayAgain={onPlayAgain ?? (() => newGame())}
           onViewReplay={() => toast('Replays arrive in Milestone 9.')}
           onQuitToMenu={onQuit}
         />

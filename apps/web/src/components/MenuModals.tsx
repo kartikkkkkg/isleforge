@@ -19,12 +19,13 @@ export function GameMenuModal({
 }: {
   onClose: () => void;
   onOpenRules: () => void;
-  onRestart: () => void;
+  /** Omitted for online games (no restart there). */
+  onRestart?: () => void;
   onResign: () => void;
   onQuitToMenu: () => void;
 }) {
   const [confirm, setConfirm] = useState<'restart' | 'resign' | null>(null);
-  if (confirm === 'restart') {
+  if (confirm === 'restart' && onRestart) {
     return (
       <ConfirmModal
         title="Restart game?"
@@ -56,9 +57,11 @@ export function GameMenuModal({
         <button className="if-btn if-btn--ghost if-menu-list__btn" onClick={onOpenRules}>
           How to play
         </button>
-        <button className="if-btn if-btn--ghost if-menu-list__btn" onClick={() => setConfirm('restart')}>
-          Restart game
-        </button>
+        {onRestart && (
+          <button className="if-btn if-btn--ghost if-menu-list__btn" onClick={() => setConfirm('restart')}>
+            Restart game
+          </button>
+        )}
         <button className="if-btn if-btn--danger if-menu-list__btn" onClick={() => setConfirm('resign')}>
           Resign
         </button>

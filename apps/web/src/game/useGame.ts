@@ -18,6 +18,8 @@ export interface Seat {
   name: string;
   color: PlayerColor;
   isBot: boolean;
+  /** Server-assigned seat id (multiplayer). Local games use `p${index + 1}`. */
+  playerId?: string;
   /** AI configuration (bots only). Defaults: normal / balanced. */
   difficulty?: Difficulty;
   personality?: Personality;
@@ -128,6 +130,41 @@ export interface GameApi {
   newGame: (seed?: number) => void;
   isBot: (playerId: string) => boolean;
   humanId: string | null;
+}
+
+/**
+ * The common game-state interface consumed by GameScreen.
+ * Implemented by the local engine adapter (useIsleforgeGame) and by the
+ * multiplayer adapter (useMultiplayerGame) — the same components render
+ * local games, online games, and (later) replays/spectators.
+ */
+export interface GameApiLike {
+  state: GameState;
+  seats: Seat[];
+  /** Local: sync, returns events. Remote: fire-and-forget over WebSocket. */
+  dispatch: (cmd: Command) => GameEvent[] | null;
+  error: string | null;
+  clearError: () => void;
+  isBot: (playerId: string) => boolean;
+  humanId: string | null;
+  /** True for the server-authoritative multiplayer adapter. */
+  remote?: boolean;
+  /** Local-only: direct engine access (client bots, animations). */
+  game?: Game;
+  /** Local-only: start a fresh game. */
+  newGame?: (seed?: number) => void;
+  /** Remote-only: recent server events for animations. */
+  recentEvents?: GameEvent[];
+  /** Remote-only: connection + room status for the indicator. */
+  remoteInfo?: {
+    connection: 'connected' | 'reconnecting' | 'disconnected';
+    roomCode: string | null;
+  };
+  /** Remote-only: room chat. */
+  chat?: {
+    messages: import('@isleforge/protocol').ChatMessage[];
+    sendChat: (text: string) => void;
+  };
 }
 
 export function useIsleforgeGame(

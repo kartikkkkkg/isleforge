@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { MainMenu } from './screens/MainMenu';
 import { GameScreen } from './screens/GameScreen';
+import { OnlineGameFlow } from './screens/OnlineGame';
 import { buildSeats, type AiSetup, type Seat } from './game/useGame';
 import './styles/tokens.css';
 import './styles/app.css';
@@ -15,7 +16,14 @@ interface Session {
 
 const DEFAULT_AI: AiSetup = { count: 3, difficulty: 'normal', personality: 'varied' };
 
+/** WebSocket server URL: override with ?server=ws://host:port for LAN play. */
+const serverUrl = (): string => {
+  if (typeof window === 'undefined') return 'ws://localhost:8080';
+  return new URLSearchParams(window.location.search).get('server') ?? 'ws://localhost:8080';
+};
+
 export default function App() {
+  const [online, setOnline] = useState(false);
   const [session, setSession] = useState<Session | null>(() => {
     // Deep-link support: ?autopilot=1[&seed=N][&fast=1] boots straight into a game (E2E + demos).
     if (typeof window === 'undefined') return null;
@@ -48,7 +56,10 @@ export default function App() {
     window.history.replaceState(null, '', window.location.pathname);
   }, []);
 
-  if (!session) return <MainMenu onStart={start} />;
+  if (online) {
+    return <OnlineGameFlow serverUrl={serverUrl()} onQuit={() => setOnline(false)} />;
+  }
+  if (!session) return <MainMenu onStart={start} onPlayOnline={() => setOnline(true)} />;
   return (
     <GameScreen
       key={`${session.autopilot}-${session.seed ?? 'random'}-${session.seats.map((s) => s.name).join(',')}`}

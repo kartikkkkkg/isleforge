@@ -1,5 +1,5 @@
 /* GameLog — scrollable feed of actual engine events.
-   ChatPanel — placeholder until multiplayer (Milestone 5). */
+   ChatPanel — room chat for online games (local games show a stub). */
 
 import { memo, useEffect, useRef, useState } from 'react';
 import type { LogEntry } from '../game/log';
@@ -58,20 +58,66 @@ export const GameLog = memo(function GameLog({
   );
 });
 
-export function ChatPanel() {
+export interface ChatApi {
+  messages: { from: string; fromName: string; text: string; ts: number }[];
+  sendChat: (text: string) => void;
+}
+
+export function ChatPanel({ chat }: { chat?: ChatApi }) {
   const [draft, setDraft] = useState('');
+  const msgsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = msgsRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [chat?.messages.length]);
+  if (!chat) {
+    return (
+      <div className="if-chat">
+        <div className="if-chat__msgs if-scroll" aria-label="Chat messages">
+          <div className="if-chat__sys">
+            Chat unlocks in online games. For now, enjoy the peaceful island air.
+          </div>
+        </div>
+        <form
+          className="if-chat__form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setDraft('');
+          }}
+        >
+          <input
+            className="if-chat__input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Chat available online…"
+            disabled
+            aria-label="Chat input (disabled in local games)"
+          />
+          <button className="if-btn if-btn--sm if-btn--ghost" type="submit" disabled>
+            Send
+          </button>
+        </form>
+      </div>
+    );
+  }
   return (
     <div className="if-chat">
-      <div className="if-chat__msgs if-scroll" aria-label="Chat messages">
-        <div className="if-chat__sys">
-          Chat unlocks with multiplayer in Milestone 5. For now, enjoy the
-          peaceful island air.
-        </div>
+      <div className="if-chat__msgs if-scroll" aria-label="Chat messages" ref={msgsRef}>
+        {chat.messages.length === 0 && (
+          <div className="if-chat__sys">Say hello to the table.</div>
+        )}
+        {chat.messages.map((m, i) => (
+          <div className="if-chat__msg" key={`${m.ts}-${i}`}>
+            <b>{m.fromName}</b> <span>{m.text}</span>
+          </div>
+        ))}
       </div>
       <form
         className="if-chat__form"
         onSubmit={(e) => {
           e.preventDefault();
+          const text = draft.trim();
+          if (text) chat.sendChat(text);
           setDraft('');
         }}
       >
@@ -79,11 +125,11 @@ export function ChatPanel() {
           className="if-chat__input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Chat coming in Milestone 5…"
-          disabled
-          aria-label="Chat input (disabled until multiplayer)"
+          placeholder="Message the table…"
+          maxLength={200}
+          aria-label="Chat input"
         />
-        <button className="if-btn if-btn--sm if-btn--ghost" type="submit" disabled>
+        <button className="if-btn if-btn--sm if-btn--ghost" type="submit">
           Send
         </button>
       </form>
@@ -94,9 +140,11 @@ export function ChatPanel() {
 export function LogChatTabs({
   entries,
   colorOf,
+  chat,
 }: {
   entries: LogEntry[];
   colorOf: (playerId?: string) => string;
+  chat?: ChatApi;
 }) {
   const [tab, setTab] = useState<'log' | 'chat'>('log');
   return (
@@ -120,7 +168,7 @@ export function LogChatTabs({
         </button>
       </div>
       <div className="if-sidecol__tabbody">
-        {tab === 'log' ? <GameLog entries={entries} colorOf={colorOf} /> : <ChatPanel />}
+        {tab === 'log' ? <GameLog entries={entries} colorOf={colorOf} /> : <ChatPanel chat={chat} />}
       </div>
     </div>
   );
