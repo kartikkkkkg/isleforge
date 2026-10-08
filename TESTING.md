@@ -53,5 +53,27 @@ human playtest at this milestone.
 ## Later milestones
 
 M5 adds multiplayer integration tests (authoritative server vs malicious
-client); M2/M18 add end-to-end browser tests for critical flows. No milestone
+client); M18 adds end-to-end browser tests for critical flows. No milestone
 is complete until its tests pass.
+
+## Milestone 2 — UI tests (`apps/web`)
+
+```bash
+cd apps/web
+npm test          # vitest + jsdom: 18 tests
+npm run e2e         # Playwright: critical flows (desktop + mobile viewports)
+```
+
+- **Unit:** log formatter (real engine events → text), demo-bot legality
+  (every chosen move re-validated by the engine), build-menu availability,
+  `activeActor` resolution.
+- **Component (jsdom):** board renders 19 hexes / 18 tokens / 9 ports / raider
+  from live state; placement targets are keyboard-accessible and dispatch;
+  control deck shows live counts, enables Roll on the human turn, opens the
+  build menu with engine-derived costs/reasons, and disables everything off-turn.
+- **E2E (Playwright):** menu → start game; setup placement clicks; roll dice
+  (real engine result, log narrates it); trade modal opens; end turn advances
+  the turn counter; build menu shows all four options; player panels show VP;
+  autopilot AI battle plays a complete game to the victory screen and
+  Play Again resets cleanly.
+- Engine's 100/100 tests still pass unchanged.

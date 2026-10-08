@@ -5,16 +5,18 @@
 ```
 isleforge/
   packages/
-    game-engine/      # M1 ✅ — deterministic rules engine (this milestone)
-    # apps/web        # M2 — game UI (planned)
-    # apps/server     # M5 — authoritative realtime server (planned)
-    # packages/bots   # M3 — AI opponents (planned)
+    game-engine/      # M1 ✅ — deterministic rules engine
+  apps/
+    web/              # M2 ✅ — browser game UI (Vite + React + TS)
 ```
 
 `packages/game-engine` has **zero runtime dependencies** and imports nothing
 from the DOM, React, Next.js, or Node APIs (only `structuredClone`, available
 in all modern runtimes). It compiles to dependency-free JS usable in the
 browser, on the server, and in bots.
+
+`apps/web` consumes the engine as a workspace dependency and adds no game
+rules of its own — see UI_ARCHITECTURE.md for the full UI design.
 
 ## Engine module map
 

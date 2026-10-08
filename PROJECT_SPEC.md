@@ -26,6 +26,25 @@ copying any proprietary source code, artwork, logos, trademarks, or text.
    complete until tests pass, docs are updated, the app runs, and the working
    state is committed.
 
+## Milestone 2 — Game UI ✅ COMPLETE (2026-10-08)
+
+Playable browser game in `apps/web` (Vite + React + TS):
+
+- Board-centered layout: SVG hex board from live engine state, player panels
+  around it, resource/action deck, game log, chat placeholder, game menu
+- Full interaction: setup placement, roll/build/trade/cards, raider flow,
+  discard picker, victory screen — every intent dispatches engine commands;
+  no rules duplicated in the frontend
+- Local demo: 1 human + 3 SimpleBot opponents (bot selects among
+  `legalCommands()`; NOT the Milestone 3 AI), plus autopilot AI-battle mode
+- Design system (tokens → components → screens), responsive (desktop/tablet/
+  mobile), keyboard-accessible, reduced-motion support
+- 18 UI tests passing (vitest/jsdom); Playwright E2E for critical flows
+- See UI_ARCHITECTURE.md
+
+Out of scope (later milestones): multiplayer, auth, matchmaking, ranked,
+replays UI, spectators, friends/chat backend, maps, expansions, modes.
+
 ## Milestone 1 — Local deterministic game engine ✅ COMPLETE (2026-10-08)
 
 Scope (all delivered and tested in `packages/game-engine`):
@@ -58,7 +77,7 @@ maps editor, expansions, rush mode, achievements, cosmetics/economy, hardening.
 
 ```
 isleforge/
-  PROJECT_SPEC.md  ARCHITECTURE.md  GAME_RULES.md  API.md
+  PROJECT_SPEC.md  ARCHITECTURE.md  GAME_RULES.md  API.md  UI_ARCHITECTURE.md
   ROADMAP.md  TESTING.md  SECURITY.md  DECISIONS.md
   README.md
   packages/
@@ -66,6 +85,15 @@ isleforge/
       src/                # types, rng, board, state, events, scoring,
                           # commands, legal, replay, engine, index, demo
       tests/              # 100 vitest tests
+  apps/
+    web/                  # Milestone 2 — browser game UI (Vite + React)
+      src/
+        game/             # engine adapter, demo bot, log formatter, build info
+        components/       # board, panels, deck, modals, log
+        screens/          # menu, game screen
+        styles/           # design tokens, components, board, screens
+      tests/              # vitest + jsdom (18 tests)
+      e2e/                # Playwright critical flows
 ```
 
 ## IP-clean statement

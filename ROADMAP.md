@@ -7,7 +7,7 @@
 | # | Milestone | Status |
 |---|---|---|
 | 1 | Local deterministic game engine | ✅ Done 2026-10-08 — `packages/game-engine`, 100 tests, demo-verified |
-| 2 | Game UI | ⬜ Next — board-centered layout, player panels, resource/build/trade/dice controls, chat, game log; desktop + responsive mobile |
+| 2 | Game UI | ✅ Done 2026-10-08 — `apps/web`, playable vs 3 bots, 18 UI tests + E2E |
 | 3 | AI opponents | ⬜ EASY/NORMAL/HARD/EXPERT via `legalCommands`; personalities later (Aggressive, Defensive, Builder, Trader, Opportunist, Balanced) |
 | 4 | Authentication | ⬜ Email/Google/Discord/Apple; profiles (username, avatar, rating, stats) |
 | 5 | Realtime multiplayer | ⬜ Authoritative WebSocket server wrapping `Game.dispatch`; server owns state, dice, trades, victory |
