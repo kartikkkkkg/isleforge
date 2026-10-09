@@ -16,6 +16,7 @@ interface MainMenuProps {
     ai: AiSetup;
   }) => void;
   onPlayOnline: () => void;
+  onPlayMatchmaking: () => void;
   onSignIn: () => void;
   onRegister: () => void;
   onProfile: () => void;
@@ -73,6 +74,7 @@ function Seg<T extends string | number>({
 export function MainMenu({
   onStart,
   onPlayOnline,
+  onPlayMatchmaking,
   onSignIn,
   onRegister,
   onProfile,
@@ -164,6 +166,11 @@ export function MainMenu({
               <button className="if-btn if-btn--primary if-btn--lg" onClick={onPlayOnline}>
                 Play Online
               </button>
+              {user && (
+                <button className="if-btn if-btn--primary if-btn--lg" onClick={onPlayMatchmaking}>
+                  ⚡ Quick Match
+                </button>
+              )}
               <button className="if-btn if-btn--ghost" onClick={onProfile}>
                 Profile
               </button>

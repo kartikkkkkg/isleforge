@@ -56,6 +56,27 @@ Delivered:
   connection indicator, chat wired into `ChatPanel`
 - no public matchmaking, accounts, or production deployment (later milestones)
 
+## Milestone 7 — MMR + casual matchmaking ✅ COMPLETE (2026-10-09)
+
+Authenticated players click Quick Match and are automatically matched.
+
+Delivered:
+
+- migration `003_matchmaking`: `player_ratings`, `rating_history`, `games.match_type`
+- multiplayer Elo: `expected = avg vs opponents`, `actual` from placement,
+  `delta = K(actual − expected)`; K=32 (48 provisional), floor 100
+- in-memory matchmaker: rating windows (±100→400 by wait), oldest-first
+  fairness, atomic formation, single-process (documented)
+- WS protocol: QUEUE_JOIN/LEAVE/STATUS, MATCH_FOUND/STARTING/ERROR
+- match formation → matchmade room → ServerGame → auto-start → M6 persistence
+  + transactional rating update (idempotent)
+- web: Quick Match button, queue screen, match found screen, profile MMR,
+  history shows "Casual Matchmaking"
+- guests rejected; multi-tab safe; disconnect cleanup
+
+Full design: `MATCHMAKING_ARCHITECTURE.md`, `RATING_SYSTEM.md`.
+Out of scope (later): visible ranks, ranked UI, leaderboards, seasons.
+
 ## Milestone 6 — Game history & player statistics ✅ COMPLETE (2026-10-09)
 
 The engine remains authoritative for gameplay; the database records the outcome.

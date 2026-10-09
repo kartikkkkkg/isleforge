@@ -16,15 +16,26 @@ export function ProfileScreen({
 }) {
   const { user, logout, authFetch } = useAuth();
   const [stats, setStats] = useState<PlayerStats | null>(null);
+  const [rating, setRating] = useState<{ rating: number; gamesRated: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authFetch('/me/stats');
-        if (!res.ok) return;
-        const data = (await res.json()) as { stats: PlayerStats };
-        if (!cancelled) setStats(data.stats);
+        const [statsRes, ratingRes] = await Promise.all([
+          authFetch('/me/stats'),
+          authFetch('/me/rating'),
+        ]);
+        if (!cancelled) {
+          if (statsRes.ok) {
+            const data = (await statsRes.json()) as { stats: PlayerStats };
+            setStats(data.stats);
+          }
+          if (ratingRes.ok) {
+            const data = (await ratingRes.json()) as { rating: number; gamesRated: number };
+            setRating(data);
+          }
+        }
       } catch {
         /* stats stay hidden on failure */
       }
@@ -87,6 +98,18 @@ export function ProfileScreen({
             <div className="if-stat">
               <span className="if-stat__value">{formatDuration(stats.totalPlayTimeSeconds)}</span>
               <span className="if-stat__label">Time Played</span>
+            </div>
+          </div>
+        )}
+        {rating && (
+          <div className="if-mmr">
+            <div className="if-stat if-stat--wide">
+              <span className="if-stat__value">{rating.rating.toLocaleString()}</span>
+              <span className="if-stat__label">MMR</span>
+            </div>
+            <div className="if-stat if-stat--wide">
+              <span className="if-stat__value">{rating.gamesRated}</span>
+              <span className="if-stat__label">Rated Games</span>
             </div>
           </div>
         )}

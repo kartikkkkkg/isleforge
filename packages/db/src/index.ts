@@ -15,6 +15,13 @@ export {
   type PersistedEvent,
   type PlayerGameStatsInput,
 } from './repos/games.js';
+export {
+  RatingsRepo,
+  INITIAL_RATING,
+  RATING_FLOOR,
+  type RatingRow,
+  type RatingResultInput,
+} from './repos/ratings.js';
 export type {
   UserRow,
   ProfileRow,

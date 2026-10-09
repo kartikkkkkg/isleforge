@@ -160,3 +160,19 @@ npm run e2e         # Playwright: critical flows (desktop + mobile viewports)
 - **Integration** (`tests/history-integration.test.ts`): 2 authenticated humans
   + 1 server AI play a full game → `GAME_ENDED` → DB has game/players/events/
   stats → history API lists it → exactly one game row.
+
+## Matchmaking testing (M7)
+
+- **Rating** (`tests/rating.test.ts`, 8 tests): expected scores, placement
+  scoring, winner/loser deltas, upset bonus, provisional K, floor,
+  determinism, opponent average.
+- **Matchmaker** (`tests/matchmaking.test.ts`, 10 tests): join/leave,
+  duplicates, multi-tab, 4-player formation, rating incompatibility, range
+  expansion, oldest-first fairness, atomicity, wait estimation.
+- **WS** (`tests/matchmaking-ws.test.ts`, 4 tests): guest rejection, join/
+  status/leave, multi-tab duplicate, 4-player match → GAME_STARTED.
+- **E2E** (`tests/matchmaking-e2e.test.ts`): 4 queued players → match →
+  full game → ratings updated once, history has MATCHMADE game.
+- **Simulations** (`scripts/sim-matchmaking.ts`, `scripts/sim-rating.ts`):
+  1000 players, 99.6%+ matched, p95 ~13s, 0 duplicates; strong/medium/weak
+  rating behavior verified.

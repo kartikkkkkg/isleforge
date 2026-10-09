@@ -145,7 +145,10 @@ export type ClientMessage =
   | { v: 1; type: 'PING'; ts: number }
   | { v: 1; type: 'RECONNECT'; sessionId: string; lastSeq?: number }
   | { v: 1; type: 'GAME_CHAT'; text: string }
-  | { v: 1; type: 'AUTHENTICATE'; accessToken: string };
+  | { v: 1; type: 'AUTHENTICATE'; accessToken: string }
+  | { v: 1; type: 'QUEUE_JOIN' }
+  | { v: 1; type: 'QUEUE_LEAVE' }
+  | { v: 1; type: 'QUEUE_STATUS' };
 
 export const CLIENT_MESSAGE_TYPES: readonly string[] = [
   'CREATE_ROOM',
@@ -160,6 +163,9 @@ export const CLIENT_MESSAGE_TYPES: readonly string[] = [
   'RECONNECT',
   'GAME_CHAT',
   'AUTHENTICATE',
+  'QUEUE_JOIN',
+  'QUEUE_LEAVE',
+  'QUEUE_STATUS',
 ];
 
 /* ------------------------------------------------------------------ */
@@ -200,7 +206,24 @@ export type ServerMessage =
       missedEvents: GameEvent[];
     }
   | { v: 1; type: 'GAME_ENDED'; winnerId: string | null; reason: string }
-  | { v: 1; type: 'AUTHENTICATED'; userId: string };
+  | { v: 1; type: 'AUTHENTICATED'; userId: string }
+  | { v: 1; type: 'QUEUE_JOINED'; queuedAt: number }
+  | {
+      v: 1;
+      type: 'QUEUE_STATUS';
+      status: 'QUEUED' | 'NOT_QUEUED';
+      queuedAt: number | null;
+      playersSearching: number;
+      estimatedWaitMs: number;
+    }
+  | { v: 1; type: 'QUEUE_LEFT' }
+  | {
+      v: 1;
+      type: 'MATCH_FOUND';
+      players: { userId: string; displayName: string }[];
+    }
+  | { v: 1; type: 'MATCH_STARTING'; roomCode: string; sessionId: string; playerId: string }
+  | { v: 1; type: 'MATCH_ERROR'; code: string; message: string };
 
 /* ------------------------------------------------------------------ */
 /* Chat                                                               */

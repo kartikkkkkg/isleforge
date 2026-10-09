@@ -67,6 +67,7 @@ describe('auth UI', () => {
       <MainMenu
         onStart={vi.fn()}
         onPlayOnline={vi.fn()}
+        onPlayMatchmaking={vi.fn()}
         onSignIn={vi.fn()}
         onRegister={vi.fn()}
         onProfile={vi.fn()}
@@ -98,6 +99,7 @@ describe('auth UI', () => {
       <MainMenu
         onStart={vi.fn()}
         onPlayOnline={vi.fn()}
+        onPlayMatchmaking={vi.fn()}
         onSignIn={vi.fn()}
         onRegister={vi.fn()}
         onProfile={vi.fn()}
@@ -120,6 +122,7 @@ describe('auth UI', () => {
       <MainMenu
         onStart={vi.fn()}
         onPlayOnline={vi.fn()}
+        onPlayMatchmaking={vi.fn()}
         onSignIn={vi.fn()}
         onRegister={vi.fn()}
         onProfile={vi.fn()}

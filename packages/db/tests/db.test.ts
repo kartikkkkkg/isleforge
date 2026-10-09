@@ -39,7 +39,7 @@ describe('db', () => {
     const again = await migrate(pool);
     expect(again).toEqual([]);
     const status = await migrationStatus(pool);
-    expect(status.applied).toEqual([1]);
+    expect(status.applied).toEqual([1, 2, 3]);
     expect(status.pending).toEqual([]);
   });
 

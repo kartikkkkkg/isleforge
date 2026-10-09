@@ -11,10 +11,11 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { GameRecorder } from './recorder.js';
-import type { GameRow, GamePlayerRow, PersistedEvent } from '@isleforge/db';
+import type { GameRow, GamePlayerRow, PersistedEvent, RatingsRepo } from '@isleforge/db';
 
 export interface HistoryRouterDeps {
   recorder: GameRecorder;
+  ratings: RatingsRepo | null;
   verifyToken: (token: string) => { userId: string } | null;
   checkRateLimit: (key: string) => boolean;
 }
@@ -68,6 +69,17 @@ export function createHistoryRouter(deps: HistoryRouterDeps) {
       return true;
     }
 
+    // GET /me/rating — current MMR (labeled MMR, not Rank).
+    if (path === '/me/rating') {
+      if (!deps.ratings) {
+        json(res, 503, { error: 'RATINGS_UNAVAILABLE' });
+        return true;
+      }
+      const row = await deps.ratings.ensure(userId);
+      json(res, 200, { rating: row.rating, gamesRated: row.games_rated });
+      return true;
+    }
+
     // GET /games?limit=&before=
     if (path === '/games') {
       const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') ?? '20', 10) || 20, 1), 100);
@@ -89,6 +101,7 @@ export function createHistoryRouter(deps: HistoryRouterDeps) {
           finishedAt: g.finished_at?.toISOString() ?? null,
           durationSeconds: g.duration_seconds,
           winnerUserId: g.winner_user_id,
+          matchType: g.match_type,
         })),
         nextCursor,
         hasMore,
@@ -145,6 +158,7 @@ export function createHistoryRouter(deps: HistoryRouterDeps) {
         durationSeconds: game.duration_seconds,
         winnerUserId: game.winner_user_id,
         winnerPlayerId: game.winner_player_id,
+        matchType: game.match_type,
       },
       players: players.map((p: GamePlayerRow) => ({
         seat: p.seat,

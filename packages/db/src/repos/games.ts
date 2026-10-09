@@ -21,6 +21,7 @@ export interface GameRow {
   duration_seconds: number | null;
   winner_user_id: string | null;
   winner_player_id: string | null;
+  match_type: 'PRIVATE' | 'MATCHMADE';
   created_at: Date;
 }
 
@@ -74,13 +75,14 @@ export class GamesRepo {
     mapId?: string | undefined;
     playerCount: number;
     startedAt?: Date | null | undefined;
+    matchType?: 'PRIVATE' | 'MATCHMADE' | undefined;
   }): Promise<GameRow> {
     const { rows } = await this.db.query<GameRow>(
-      `INSERT INTO games (id, game_type, game_mode, status, map_id, player_count, started_at)
-       VALUES ($1, $2, $3, 'STARTED', $4, $5, COALESCE($6, now()))
+      `INSERT INTO games (id, game_type, game_mode, status, map_id, player_count, started_at, match_type)
+       VALUES ($1, $2, $3, 'STARTED', $4, $5, COALESCE($6, now()), COALESCE($7, 'PRIVATE'))
        ON CONFLICT (id) DO NOTHING
        RETURNING *`,
-      [input.id, input.gameType, input.gameMode ?? 'CASUAL', input.mapId ?? 'archipelago', input.playerCount, input.startedAt ?? null],
+      [input.id, input.gameType, input.gameMode ?? 'CASUAL', input.mapId ?? 'archipelago', input.playerCount, input.startedAt ?? null, input.matchType ?? null],
     );
     if (rows[0]) return rows[0];
     // Already existed (idempotent start) — return the existing row.

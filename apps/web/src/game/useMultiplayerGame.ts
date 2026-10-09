@@ -125,7 +125,7 @@ export interface UseMultiplayer {
 
 export function useMultiplayer(
   url: string,
-  opts: { getAccessToken?: () => string | null } = {},
+  opts: { getAccessToken?: () => string | null; initialSessionId?: string | null } = {},
 ): UseMultiplayer {
   const [connection, setConnection] = useState<ConnectionHealth>('disconnected');
   const [room, setRoom] = useState<RoomView | null>(null);
@@ -225,7 +225,10 @@ export function useMultiplayer(
         }
         // Resume a previous session if we have one for this server.
         const stored = loadSession();
-        const sid = sessionRef.current ?? (stored?.url === url ? stored.sessionId : null);
+        const sid =
+          opts.initialSessionId ??
+          sessionRef.current ??
+          (stored?.url === url ? stored.sessionId : null);
         if (sid) {
           setConnection('connected');
           sock.send(JSON.stringify({ v: 1, type: 'RECONNECT', sessionId: sid }));

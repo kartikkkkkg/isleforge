@@ -145,3 +145,12 @@ replay-verifies every finished game.
 - **Server (M5):** `Game.dispatch` *is* the authoritative move handler; the
   server will wrap it with auth, rooms, and broadcast.
 - **Replays (M9):** `replayEvents` + `serializeEvents` are the replay backend.
+
+## Matchmaking (M7)
+
+In-memory `Matchmaker` (single-process) pairs authenticated players by MMR.
+WS protocol: `QUEUE_JOIN`/`LEAVE`/`STATUS` → `MATCH_FOUND`/`MATCH_STARTING`.
+On match: matchmade room (`match_type = MATCHMADE`) + normal `ServerGame`,
+auto-start, clients reconnect via session. Ratings: multiplayer Elo
+(`apps/server/src/rating/elo.ts`), updated transactionally at game end.
+Full design: `MATCHMAKING_ARCHITECTURE.md`, `RATING_SYSTEM.md`.

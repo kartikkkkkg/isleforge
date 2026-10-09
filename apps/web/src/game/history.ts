@@ -12,6 +12,7 @@ export interface HistoryGameSummary {
   finishedAt: string | null;
   durationSeconds: number | null;
   winnerUserId: string | null;
+  matchType: 'PRIVATE' | 'MATCHMADE';
 }
 
 export interface HistoryPlayer {
@@ -56,4 +57,8 @@ export function formatDate(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export function matchTypeLabel(matchType: 'PRIVATE' | 'MATCHMADE'): string {
+  return matchType === 'MATCHMADE' ? 'Casual Matchmaking' : 'Private Room';
 }

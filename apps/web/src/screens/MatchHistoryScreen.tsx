@@ -6,6 +6,7 @@ import { useAuth } from '../game/useAuth';
 import {
   formatDate,
   formatDuration,
+  matchTypeLabel,
   type HistoryGameSummary,
 } from '../game/history';
 
@@ -98,7 +99,7 @@ export function MatchHistoryScreen({ onSelectGame }: { onSelectGame: (gameId: st
                   {won ? 'Victory' : 'Defeat'}
                 </span>
                 <span className="history-meta">
-                  {g.playerCount}-player {g.gameMode.charAt(0) + g.gameMode.slice(1).toLowerCase()}
+                  {g.playerCount}-player · {matchTypeLabel(g.matchType)}
                 </span>
                 <span className="history-sub">
                   {formatDuration(g.durationSeconds)} · {formatDate(g.finishedAt)}

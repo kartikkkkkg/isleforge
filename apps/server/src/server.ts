@@ -33,7 +33,9 @@ import { createAuthRouter } from './auth/http.js';
 import { verifyAccessToken } from './auth/tokens.js';
 import { createHistoryRouter } from './history/http.js';
 import { GameRecorder, type RecorderSeat } from './history/recorder.js';
-import { getPool, migrate } from '@isleforge/db';
+import { Matchmaker, DEFAULT_MATCHMAKING_CONFIG, type FormedMatch } from './matchmaking/queue.js';
+import { computeDeltas, type EloPlayer } from './rating/elo.js';
+import { getPool, migrate, RatingsRepo, UsersRepo } from '@isleforge/db';
 import type { Pool } from 'pg';
 
 export interface ServerOptions {
@@ -100,6 +102,10 @@ export class IsleforgeServer {
   /** M6: game history recorder. Present when a DB pool is available. */
   private recorder: GameRecorder | null = null;
   private historyRouter: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
+  /** M7: matchmaking. Present when a DB pool is available. */
+  private matchmaker: Matchmaker | null = null;
+  private ratingsRepo: RatingsRepo | null = null;
+  private usersRepo: UsersRepo | null = null;
 
   constructor(private opts: ServerOptions) {
     this.graceMs = opts.reconnectGraceMs ?? DEFAULT_GRACE_MS;
@@ -130,12 +136,18 @@ export class IsleforgeServer {
       this.recorder = new GameRecorder(this.dbPool);
       this.historyRouter = createHistoryRouter({
         recorder: this.recorder,
+        ratings: this.ratingsRepo,
         verifyToken: (token) => {
           const payload = verifyAccessToken(secret, token);
           return payload ? { userId: payload.sub } : null;
         },
         checkRateLimit: (key) => this.limiter.check(key, 'auth_profile'),
       });
+      // M7: matchmaking + ratings use the same pool.
+      this.ratingsRepo = new RatingsRepo(this.dbPool);
+      this.usersRepo = new UsersRepo(this.dbPool);
+      this.matchmaker = new Matchmaker(DEFAULT_MATCHMAKING_CONFIG, (m) => this.onMatchFound(m));
+      this.matchmaker.start();
       const router = createAuthRouter(this.authService, secret, {
         secureCookies: this.opts.auth.secureCookies ?? false,
         devExposeResetTokens: this.opts.auth.devExposeResetTokens ?? false,
@@ -189,6 +201,7 @@ export class IsleforgeServer {
 
   async stop(): Promise<void> {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.matchmaker?.stop();
     for (const t of this.graceTimers.values()) clearTimeout(t);
     this.graceTimers.clear();
     for (const conn of this.conns.values()) {
@@ -262,6 +275,8 @@ export class IsleforgeServer {
 
   private onClose(conn: Conn): void {
     this.conns.delete(conn.id);
+    // M7: drop queue entries when their last watching connection closes.
+    this.onConnQueueCleanup(conn);
     if (conn.replaced) return;
     const { roomCode, playerId } = conn;
     if (conn.sessionId && roomCode && playerId) {
@@ -372,6 +387,15 @@ export class IsleforgeServer {
         break;
       case 'AUTHENTICATE':
         void this.onAuthenticate(conn, msg);
+        break;
+      case 'QUEUE_JOIN':
+        void this.onQueueJoin(conn);
+        break;
+      case 'QUEUE_LEAVE':
+        this.onQueueLeave(conn);
+        break;
+      case 'QUEUE_STATUS':
+        this.onQueueStatus(conn);
         break;
     }
   }
@@ -619,6 +643,172 @@ export class IsleforgeServer {
       return;
     }
     const room = res.value;
+    this.beginGame(room);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* M7: matchmaking                                                */
+  /* ---------------------------------------------------------------- */
+
+  private matchError(conn: Conn, code: string, message: string): void {
+    this.send(conn, { v: 1, type: 'MATCH_ERROR', code, message });
+  }
+
+  private async onQueueJoin(conn: Conn): Promise<void> {
+    if (!this.matchmaker || !this.ratingsRepo || !this.usersRepo) {
+      this.matchError(conn, 'MATCHMAKING_UNAVAILABLE', 'Matchmaking is not enabled on this server.');
+      return;
+    }
+    if (!conn.userId) {
+      this.matchError(conn, 'NOT_AUTHENTICATED', 'Sign in to play matchmaking.');
+      return;
+    }
+    if (conn.roomCode) {
+      this.matchError(conn, 'ALREADY_IN_ROOM', 'Leave your current room first.');
+      return;
+    }
+    if (!this.limiter.check(conn.id, 'matchmaking')) {
+      this.matchError(conn, 'RATE_LIMITED', 'Queueing too fast. Slow down.');
+      return;
+    }
+    const userId = conn.userId;
+    // One queue entry per user (multi-tab safe).
+    if (this.matchmaker.getEntry(userId)) {
+      this.matchError(conn, 'ALREADY_QUEUED', 'You are already in the queue.');
+      return;
+    }
+    const rating = await this.ratingsRepo.ensure(userId);
+    const profile = await this.usersRepo.getProfile(userId);
+    const displayName = profile?.display_name ?? 'Player';
+    const joined = this.matchmaker.join({
+      userId,
+      rating: rating.rating,
+      queuedAt: Date.now(),
+      gameMode: 'CASUAL',
+      connId: conn.id,
+    });
+    if (!joined) {
+      this.matchError(conn, 'ALREADY_QUEUED', 'You are already in the queue.');
+      return;
+    }
+    // Stash the display name for MATCH_FOUND (not trusted from the client).
+    const entry = this.matchmaker.getEntry(userId);
+    if (entry) (entry as { displayName?: string }).displayName = displayName;
+    this.send(conn, { v: 1, type: 'QUEUE_JOINED', queuedAt: entry!.queuedAt });
+  }
+
+  private onQueueLeave(conn: Conn): void {
+    if (!this.matchmaker || !conn.userId) return;
+    const removed = this.matchmaker.leave(conn.userId, conn.id);
+    if (removed) this.send(conn, { v: 1, type: 'QUEUE_LEFT' });
+  }
+
+  private onQueueStatus(conn: Conn): void {
+    if (!this.matchmaker || !conn.userId) return;
+    const entry = this.matchmaker.getEntry(conn.userId);
+    // Multi-tab: joining from another tab reuses the entry.
+    if (entry && !entry.connIds.has(conn.id)) entry.connIds.add(conn.id);
+    this.send(conn, {
+      v: 1,
+      type: 'QUEUE_STATUS',
+      status: entry ? 'QUEUED' : 'NOT_QUEUED',
+      queuedAt: entry?.queuedAt ?? null,
+      playersSearching: this.matchmaker.size,
+      estimatedWaitMs: this.matchmaker.estimatedWaitMs(),
+    });
+  }
+
+  /** Remove from queue on disconnect (stale entries are not left behind). */
+  private onConnQueueCleanup(conn: Conn): void {
+    if (!this.matchmaker || !conn.userId) return;
+    this.matchmaker.leave(conn.userId, conn.id);
+  }
+
+  /**
+   * A match formed: create a matchmade room, bind the authenticated users,
+   * notify, and auto-start. Atomic: players were removed from the queue
+   * before this runs, so no player is in two matches.
+   */
+  private async onMatchFound(match: FormedMatch): Promise<void> {
+    if (!this.usersRepo) return;
+    // Resolve live connections for each user.
+    const participants: { userId: string; displayName: string; conns: Conn[] }[] = [];
+    for (const userId of match.userIds) {
+      const conns = [...this.conns.values()].filter((c) => c.userId === userId && !c.roomCode);
+      if (conns.length === 0) {
+        // Player vanished between match and formation: requeue the rest.
+        for (const p of participants) {
+          const rating = await this.ratingsRepo!.ensure(p.userId);
+          this.matchmaker!.join({
+            userId: p.userId,
+            rating: rating.rating,
+            queuedAt: Date.now(),
+            gameMode: 'CASUAL',
+            connId: p.conns[0]!.id,
+          });
+        }
+        return;
+      }
+      const profile = await this.usersRepo.getProfile(userId);
+      participants.push({
+        userId,
+        displayName: profile?.display_name ?? 'Player',
+        conns,
+      });
+    }
+
+    // Create a matchmade room (separate from private rooms).
+    const { room } = this.rooms.createRoom(participants[0]!.displayName, 4);
+    (room as { matchType?: string }).matchType = 'MATCHMADE';
+    // Track session per user for MATCH_STARTING.
+    const userSessions = new Map<string, { sessionId: string; playerId: string }>();
+    const first = room.players[0]!;
+    const firstSession = this.sessions.create(first.playerId, room.code, participants[0]!.userId);
+    userSessions.set(participants[0]!.userId, { sessionId: firstSession.sessionId, playerId: first.playerId });
+    for (const c of participants[0]!.conns) this.attach(c, room.code, first.playerId, firstSession.sessionId);
+
+    for (let i = 1; i < participants.length; i++) {
+      const p = participants[i]!;
+      const res = this.rooms.joinRoom(room.code, p.displayName);
+      if (!res.ok) {
+        // Should not happen; dissolve the room.
+        this.rooms.closeRoom(room.code);
+        return;
+      }
+      const session = this.sessions.create(res.value.player.playerId, room.code, p.userId);
+      userSessions.set(p.userId, { sessionId: session.sessionId, playerId: res.value.player.playerId });
+      for (const c of p.conns) this.attach(c, room.code, res.value.player.playerId, session.sessionId);
+    }
+
+    // Notify all participants.
+    const names = participants.map((p) => ({ userId: p.userId, displayName: p.displayName }));
+    for (const p of participants) {
+      for (const c of p.conns) {
+        this.send(c, { v: 1, type: 'MATCH_FOUND', players: names });
+      }
+    }
+
+    // Auto-start (no manual accept in this milestone).
+    for (const p of participants) {
+      const s = userSessions.get(p.userId)!;
+      for (const c of p.conns) {
+        this.send(c, {
+          v: 1,
+          type: 'MATCH_STARTING',
+          roomCode: room.code,
+          sessionId: s.sessionId,
+          playerId: s.playerId,
+        });
+      }
+    }
+    this.beginGame(room);
+  }
+
+  /**
+   * Start the engine game for a room. Extracted from onStartGame so
+   * matchmaking can reuse it.
+   */
+  private beginGame(room: Room): void {
     const gameId = `g${randomBytes(8).toString('hex')}`;
     const aiSeats = new Map<string, AiSeatConfig>();
     for (const p of room.players) {
@@ -647,11 +837,8 @@ export class IsleforgeServer {
       if (!target) continue;
       this.send(target, { v: 1, type: 'GAME_STARTED', gameId, playerId: p.playerId });
     }
-    // Genesis events (GAME_CREATED) so every client's stream starts at seq 0 —
-    // required for gapless sequencing and replay reconstruction.
     this.broadcastEvents(room.code, game, game.eventsAfter(-1));
     this.snapshotToAll(room.code, game);
-    // Opening AI moves (e.g. an AI places first in setup).
     const aiEvents = game.pumpAi();
     if (aiEvents.length > 0) {
       this.broadcastEvents(room.code, game, aiEvents);
@@ -686,6 +873,7 @@ export class IsleforgeServer {
         gameType: 'ONLINE',
         gameMode: 'CASUAL',
         mapId: 'archipelago',
+        matchType: (room as { matchType?: string }).matchType === 'MATCHMADE' ? 'MATCHMADE' : 'PRIVATE',
         seats: this.seatsFor(room),
         startedAt: new Date(),
       })
@@ -699,6 +887,7 @@ export class IsleforgeServer {
     const game = this.games.get(roomCode);
     if (!room || !game || !room.gameId) return;
     const recorder = this.recorder;
+    const ratingsRepo = this.ratingsRepo;
     const gameId = room.gameId;
     void recorder
       .recordEnd({
@@ -708,10 +897,75 @@ export class IsleforgeServer {
         seats: this.seatsFor(room),
         finishedAt: new Date(),
       })
-      .then(({ recorded }) => {
-        if (recorded) console.log(`[history] game ${gameId} persisted`);
+      .then(({ recorded, standings }) => {
+        if (recorded) {
+          console.log(`[history] game ${gameId} persisted`);
+          // M7: update ratings (idempotent per game; abandoned games skip).
+          if (ratingsRepo) void this.applyRatingUpdate(gameId, standings);
+        }
       })
       .catch((e) => console.error('[history] recordEnd failed:', (e as Error).message));
+  }
+
+  /**
+   * M7: apply Elo rating changes after a completed game. Only authenticated
+   * players with a userId are rated. Idempotent via UNIQUE(user_id, game_id).
+   */
+  private async applyRatingUpdate(
+    gameId: string,
+    standings: { userId: string | null; finishPosition: number; won: boolean }[],
+  ): Promise<void> {
+    const repo = this.ratingsRepo;
+    const pool = this.dbPool;
+    if (!repo || !pool) return;
+    const rated = standings.filter((s) => s.userId) as {
+      userId: string;
+      finishPosition: number;
+      won: boolean;
+    }[];
+    if (rated.length < 2) return; // need opponents
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const tx = new RatingsRepo(client);
+      // Load the stable pre-game snapshot (SELECT FOR UPDATE).
+      const snapshots: EloPlayer[] = [];
+      for (const s of rated) {
+        await tx.ensure(s.userId);
+        const locked = await client.query(
+          `SELECT rating, games_rated FROM player_ratings WHERE user_id = $1 FOR UPDATE`,
+          [s.userId],
+        );
+        const r = locked.rows[0] as { rating: number; games_rated: number };
+        snapshots.push({
+          userId: s.userId,
+          rating: r.rating,
+          gamesRated: r.games_rated,
+          placement: s.finishPosition,
+        });
+      }
+      const deltas = computeDeltas(snapshots);
+      await tx.applyGameResults(
+        gameId,
+        deltas.map((d, i) => ({
+          userId: d.userId,
+          placement: rated[i]!.finishPosition,
+          won: rated[i]!.won,
+          ratingBefore: d.ratingBefore,
+          ratingAfter: d.ratingAfter,
+          ratingDelta: d.delta,
+          opponentAverageRating: d.opponentAverageRating,
+        })),
+      );
+      await client.query('COMMIT');
+      console.log(`[rating] game ${gameId}: updated ${deltas.length} players`);
+    } catch (e) {
+      await client.query('ROLLBACK');
+      console.error('[rating] update failed:', (e as Error).message);
+    } finally {
+      client.release();
+    }
   }
 
   private onGameCommand(conn: Conn, msg: Extract<ClientMessage, { type: 'GAME_COMMAND' }>): void {

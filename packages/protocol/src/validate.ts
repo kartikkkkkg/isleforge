@@ -345,6 +345,12 @@ export function parseClientMessage(data: unknown, byteLength?: number): ParseRes
       }
       return { ok: true, message: { v: 1, type: 'AUTHENTICATE', accessToken: data['accessToken'] } };
     }
+    case 'QUEUE_JOIN':
+      return { ok: true, message: { v: 1, type: 'QUEUE_JOIN' } };
+    case 'QUEUE_LEAVE':
+      return { ok: true, message: { v: 1, type: 'QUEUE_LEAVE' } };
+    case 'QUEUE_STATUS':
+      return { ok: true, message: { v: 1, type: 'QUEUE_STATUS' } };
     default:
       return fail('INVALID_MESSAGE', `Unhandled message type: ${type}.`);
   }

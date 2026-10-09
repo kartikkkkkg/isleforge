@@ -29,7 +29,7 @@ describe('game history db', () => {
     pool = new Pool({ connectionString: testCs, max: 5 });
     await migrate(pool);
     const status = await migrationStatus(pool);
-    expect(status.applied).toEqual([1, 2]);
+    expect(status.applied).toEqual([1, 2, 3]);
 
     games = new GamesRepo(pool);
     users = new UsersRepo(pool);

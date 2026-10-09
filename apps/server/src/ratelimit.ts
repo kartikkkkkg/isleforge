@@ -36,6 +36,8 @@ export const DEFAULT_LIMITS: Record<string, RateLimit> = {
   auth_verification: { windowMs: 3_600_000, max: 5 },
   /** Auth: WS AUTHENTICATE attempts per connection. */
   auth_ws: { windowMs: 60_000, max: 10 },
+  /** Matchmaking: queue operations per connection. */
+  matchmaking: { windowMs: 60_000, max: 20 },
 };
 
 export class RateLimiter {

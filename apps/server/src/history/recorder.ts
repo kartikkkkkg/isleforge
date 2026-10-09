@@ -30,6 +30,7 @@ export interface RecordStartInput {
   gameType: 'ONLINE' | 'LOCAL';
   gameMode?: 'CASUAL' | 'RANKED' | 'RUSH' | 'CUSTOM' | undefined;
   mapId?: string | undefined;
+  matchType?: 'PRIVATE' | 'MATCHMADE' | undefined;
   seats: RecorderSeat[];
   startedAt: Date;
 }
@@ -96,6 +97,7 @@ export class GameRecorder {
       mapId: input.mapId,
       playerCount: input.seats.length,
       startedAt: input.startedAt,
+      matchType: input.matchType,
     });
     const players: GamePlayerInput[] = input.seats.map((s) => ({
       seat: s.seat,

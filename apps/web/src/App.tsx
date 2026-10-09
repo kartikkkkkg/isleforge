@@ -6,6 +6,8 @@ import { LoginScreen } from './screens/LoginScreen';
 import { RegisterScreen } from './screens/RegisterScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { MatchHistoryScreen } from './screens/MatchHistoryScreen';
+import { MatchmakingScreen } from './screens/MatchmakingScreen';
+import { MatchmadeGameFlow } from './screens/MatchmadeGame';
 import { GameDetailScreen } from './screens/GameDetailScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AuthProvider, useAuth } from './game/useAuth';
@@ -29,12 +31,13 @@ const serverUrl = (): string => {
   return new URLSearchParams(window.location.search).get('server') ?? 'ws://localhost:8080';
 };
 
-type Screen = 'menu' | 'login' | 'register' | 'profile' | 'settings' | 'history' | 'game-detail';
+type Screen = 'menu' | 'login' | 'register' | 'profile' | 'settings' | 'history' | 'game-detail' | 'matchmaking' | 'matchmade-game';
 
 function Shell() {
   const [online, setOnline] = useState(false);
   const [screen, setScreen] = useState<Screen>('menu');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [matchmadeSessionId, setMatchmadeSessionId] = useState<string | null>(null);
   const { logout } = useAuth();
   const [session, setSession] = useState<Session | null>(() => {
     // Deep-link support: ?autopilot=1[&seed=N][&fast=1] boots straight into a game (E2E + demos).
@@ -109,6 +112,27 @@ function Shell() {
   if (screen === 'game-detail' && selectedGameId) {
     return <GameDetailScreen gameId={selectedGameId} onBack={() => setScreen('history')} />;
   }
+  if (screen === 'matchmaking') {
+    return (
+      <MatchmakingScreen
+        serverUrl={serverUrl()}
+        onGameStart={({ sessionId }) => {
+          setMatchmadeSessionId(sessionId);
+          setScreen('matchmade-game');
+        }}
+        onCancel={goMenu}
+      />
+    );
+  }
+  if (screen === 'matchmade-game' && matchmadeSessionId) {
+    return (
+      <MatchmadeGameFlow
+        serverUrl={serverUrl()}
+        sessionId={matchmadeSessionId}
+        onQuit={goMenu}
+      />
+    );
+  }
   if (screen === 'settings') {
     return <SettingsScreen onBack={goMenu} />;
   }
@@ -117,6 +141,7 @@ function Shell() {
       <MainMenu
         onStart={start}
         onPlayOnline={() => setOnline(true)}
+        onPlayMatchmaking={() => setScreen('matchmaking')}
         onSignIn={() => setScreen('login')}
         onRegister={() => setScreen('register')}
         onProfile={() => setScreen('profile')}
