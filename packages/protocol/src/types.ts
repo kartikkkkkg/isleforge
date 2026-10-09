@@ -144,7 +144,8 @@ export type ClientMessage =
   | { v: 1; type: 'GAME_COMMAND'; commandId: string; command: WireCommand }
   | { v: 1; type: 'PING'; ts: number }
   | { v: 1; type: 'RECONNECT'; sessionId: string; lastSeq?: number }
-  | { v: 1; type: 'GAME_CHAT'; text: string };
+  | { v: 1; type: 'GAME_CHAT'; text: string }
+  | { v: 1; type: 'AUTHENTICATE'; accessToken: string };
 
 export const CLIENT_MESSAGE_TYPES: readonly string[] = [
   'CREATE_ROOM',
@@ -158,6 +159,7 @@ export const CLIENT_MESSAGE_TYPES: readonly string[] = [
   'PING',
   'RECONNECT',
   'GAME_CHAT',
+  'AUTHENTICATE',
 ];
 
 /* ------------------------------------------------------------------ */
@@ -197,7 +199,8 @@ export type ServerMessage =
       /** Events the client missed while away (after lastSeq). */
       missedEvents: GameEvent[];
     }
-  | { v: 1; type: 'GAME_ENDED'; winnerId: string | null; reason: string };
+  | { v: 1; type: 'GAME_ENDED'; winnerId: string | null; reason: string }
+  | { v: 1; type: 'AUTHENTICATED'; userId: string };
 
 /* ------------------------------------------------------------------ */
 /* Chat                                                               */

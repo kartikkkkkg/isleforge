@@ -1,16 +1,12 @@
 {
   "dependencies": {
-    "@isleforge/ai": "0.3.0",
-    "@isleforge/db": "0.5.0",
-    "@isleforge/game-engine": "0.1.0",
-    "@isleforge/protocol": "0.1.0",
-    "ws": "^8.22.0"
+    "embedded-postgres": "^18.4.0-beta.17",
+    "pg": "^8.13.1"
   },
-  "description": "Authoritative realtime multiplayer server for Isleforge (Milestone 4). Owns game state; browsers are untrusted clients.",
+  "description": "PostgreSQL persistence for Isleforge (Milestone 5): versioned migrations, typed repositories for users, profiles, sessions, password resets. No game rules here.",
   "devDependencies": {
     "@types/node": "^26.6.4",
-    "@types/ws": "^8.18.1",
-    "tsx": "^4.19.2",
+    "@types/pg": "^8.11.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   },
@@ -21,18 +17,18 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "migrations"
   ],
   "main": "./dist/index.js",
-  "name": "@isleforge/server",
+  "name": "@isleforge/db",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx src/index.ts",
-    "start": "node dist/index.js",
+    "migrate": "node dist/migrate-cli.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.check.json"
   },
   "type": "module",
   "types": "./dist/index.d.ts",
-  "version": "0.1.0"
+  "version": "0.5.0"
 }

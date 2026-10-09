@@ -16,17 +16,23 @@ export interface PlayerSession {
   playerId: string;
   roomCode: string;
   createdAt: number;
+  /**
+   * Authenticated user id bound at seat-claim time (M5). Null for guests.
+   * RECONNECT must present credentials for this user to reclaim the seat.
+   */
+  userId: string | null;
 }
 
 export class SessionManager {
   private sessions = new Map<string, PlayerSession>();
 
-  create(playerId: string, roomCode: string): PlayerSession {
+  create(playerId: string, roomCode: string, userId: string | null = null): PlayerSession {
     const session: PlayerSession = {
       sessionId: randomUUID(),
       playerId,
       roomCode,
       createdAt: Date.now(),
+      userId,
     };
     this.sessions.set(session.sessionId, session);
     return session;

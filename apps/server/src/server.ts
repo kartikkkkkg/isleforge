@@ -11,7 +11,7 @@
  * always comes from the session, never from client-supplied playerIds.
  */
 
-import { createServer, type Server as HttpServer } from 'node:http';
+import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
@@ -28,6 +28,11 @@ import { RoomManager, type Room } from './rooms.js';
 import { SessionManager, type PlayerSession } from './sessions.js';
 import { RateLimiter, DEFAULT_LIMITS, type RateLimit } from './ratelimit.js';
 import { ServerGame, maskEventForViewer, type AiSeatConfig } from './game.js';
+import { AuthService, type AuthConfig } from './auth/service.js';
+import { createAuthRouter } from './auth/http.js';
+import { verifyAccessToken } from './auth/tokens.js';
+import { getPool, migrate } from '@isleforge/db';
+import type { Pool } from 'pg';
 
 export interface ServerOptions {
   port: number;
@@ -37,6 +42,19 @@ export interface ServerOptions {
   heartbeatMs?: number;
   /** Override specific rate-limit categories (merged over defaults). */
   rateLimits?: Record<string, RateLimit>;
+  /**
+   * Auth configuration (M5). When omitted, the server runs without auth
+   * (guest-only, M4 behavior). When provided, /auth/* is served and WS
+   * AUTHENTICATE is accepted.
+   */
+  auth?: AuthConfig & {
+    /** Run migrations on start. */
+    autoMigrate?: boolean;
+    /** Secure cookie flag (production https). */
+    secureCookies?: boolean;
+    /** Expose reset tokens in dev responses (no email provider). */
+    devExposeResetTokens?: boolean;
+  };
 }
 
 interface Conn {
@@ -45,6 +63,8 @@ interface Conn {
   sessionId: string | null;
   playerId: string | null;
   roomCode: string | null;
+  /** Authenticated user id (M5). Null for guests / unauthenticated. */
+  userId: string | null;
   /** Set when this connection was superseded by a RECONNECT (skip close logic). */
   replaced: boolean;
   alive: boolean;
@@ -70,6 +90,11 @@ export class IsleforgeServer {
   private readonly graceMs: number;
   private readonly heartbeatMs: number;
   private boundPort = 0;
+  /** M5 auth. Null when the server runs without a database (guest-only). */
+  private dbPool: Pool | null = null;
+  private authService: AuthService | null = null;
+  private authRouter: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
+  private authSecret: string | null = null;
 
   constructor(private opts: ServerOptions) {
     this.graceMs = opts.reconnectGraceMs ?? DEFAULT_GRACE_MS;
@@ -87,7 +112,41 @@ export class IsleforgeServer {
   }
 
   async start(): Promise<void> {
-    this.http = createServer((_req, res) => {
+    // M5: optional auth. Needs DATABASE_URL (or equivalent PG* env).
+    if (this.opts.auth) {
+      const secret = this.opts.auth.accessTokenSecret;
+      this.dbPool = getPool();
+      if (this.opts.auth.autoMigrate !== false) {
+        await migrate(this.dbPool);
+      }
+      this.authService = new AuthService(this.dbPool, this.opts.auth);
+      this.authSecret = secret;
+      const router = createAuthRouter(this.authService, secret, {
+        secureCookies: this.opts.auth.secureCookies ?? false,
+        devExposeResetTokens: this.opts.auth.devExposeResetTokens ?? false,
+        checkRateLimit: (key, endpoint) =>
+          this.limiter.check(key, `auth_${endpoint}`),
+        clientKey: (req) => {
+          const fwd = req.headers['x-forwarded-for'];
+          const ip = (Array.isArray(fwd) ? fwd[0] : fwd?.split(',')[0])?.trim();
+          return ip || req.socket.remoteAddress || 'unknown';
+        },
+      });
+      this.authRouter = router;
+    }
+
+    this.http = createServer((req, res) => {
+      if (this.authRouter) {
+        // Auth routes are async; fire and let them respond.
+        const router = this.authRouter;
+        void router(req, res).then((handled) => {
+          if (!handled) {
+            res.writeHead(200, { 'content-type': 'text/plain' });
+            res.end('isleforge multiplayer server\n');
+          }
+        });
+        return;
+      }
       res.writeHead(200, { 'content-type': 'text/plain' });
       res.end('isleforge multiplayer server\n');
     });
@@ -143,6 +202,7 @@ export class IsleforgeServer {
       sessionId: null,
       playerId: null,
       roomCode: null,
+      userId: null,
       replaced: false,
       alive: true,
       lastPongAt: Date.now(),
@@ -289,7 +349,41 @@ export class IsleforgeServer {
       case 'GAME_CHAT':
         this.onChat(conn, msg);
         break;
+      case 'AUTHENTICATE':
+        void this.onAuthenticate(conn, msg);
+        break;
     }
+  }
+
+  /**
+   * M5: bind an authenticated user id to this WebSocket connection.
+   * The server verifies the access token itself — the client never asserts
+   * its own user id.
+   */
+  private async onAuthenticate(
+    conn: Conn,
+    msg: Extract<ClientMessage, { type: 'AUTHENTICATE' }>,
+  ): Promise<void> {
+    if (!this.authService || !this.authSecret) {
+      this.sendError(conn, 'INVALID_MESSAGE', 'Authentication is not enabled on this server.');
+      return;
+    }
+    if (!this.limiter.check(conn.id, 'auth_ws')) {
+      this.sendError(conn, 'RATE_LIMITED', 'Too many authentication attempts.');
+      return;
+    }
+    const claims = verifyAccessToken(this.authSecret, msg.accessToken);
+    if (!claims) {
+      this.sendError(conn, 'INVALID_MESSAGE', 'Invalid or expired access token.');
+      return;
+    }
+    const ok = await this.authService.verifyAccess(claims.sub, claims.sid);
+    if (!ok) {
+      this.sendError(conn, 'INVALID_MESSAGE', 'Session revoked or expired.');
+      return;
+    }
+    conn.userId = claims.sub;
+    this.send(conn, { v: 1, type: 'AUTHENTICATED', userId: claims.sub });
   }
 
   private requireSeat(conn: Conn): { room: Room; playerId: string } | null {
@@ -325,7 +419,7 @@ export class IsleforgeServer {
       return;
     }
     const { room, host } = this.rooms.createRoom(msg.name, msg.settings?.roomSize ?? 4);
-    const session = this.sessions.create(host.playerId, room.code);
+    const session = this.sessions.create(host.playerId, room.code, conn.userId);
     this.attach(conn, room.code, host.playerId, session.sessionId);
     this.send(conn, {
       v: 1,
@@ -351,7 +445,7 @@ export class IsleforgeServer {
       return;
     }
     const { room, player } = res.value;
-    const session = this.sessions.create(player.playerId, room.code);
+    const session = this.sessions.create(player.playerId, room.code, conn.userId);
     this.attach(conn, room.code, player.playerId, session.sessionId);
     this.send(conn, {
       v: 1,
@@ -385,6 +479,14 @@ export class IsleforgeServer {
     }
     const player = room.players.find((p) => p.playerId === session.playerId);
     if (!player || player.isBot) return fail('Player not found in room.');
+
+    // M5: an authenticated seat can only be reclaimed by the same user.
+    // The client AUTHENTICATEs first; the server compares, never trusts.
+    if (session.userId !== null && conn.userId !== session.userId) {
+      return fail('This seat belongs to a different account. Authenticate as the seat owner first.');
+    }
+    // Bind the (possibly freshly authenticated) user to the connection.
+    if (session.userId !== null) conn.userId = session.userId;
 
     // Supersede any stale connection for this seat.
     const old = this.playerConns.get(this.playerKey(room.code, player.playerId));

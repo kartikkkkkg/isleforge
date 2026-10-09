@@ -335,6 +335,16 @@ export function parseClientMessage(data: unknown, byteLength?: number): ParseRes
       }
       return { ok: true, message: { v: 1, type: 'GAME_CHAT', text: data['text'].trim() } };
     }
+    case 'AUTHENTICATE': {
+      if (
+        typeof data['accessToken'] !== 'string' ||
+        data['accessToken'].length === 0 ||
+        data['accessToken'].length > 4096
+      ) {
+        return fail('INVALID_MESSAGE', 'AUTHENTICATE accessToken must be a non-empty string.');
+      }
+      return { ok: true, message: { v: 1, type: 'AUTHENTICATE', accessToken: data['accessToken'] } };
+    }
     default:
       return fail('INVALID_MESSAGE', `Unhandled message type: ${type}.`);
   }
