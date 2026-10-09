@@ -4,6 +4,8 @@
 import { useState } from 'react';
 import type { Difficulty, Personality } from '@isleforge/ai';
 import { RulesModal } from '../components/MenuModals';
+import { useAuth } from '../game/useAuth';
+import { Avatar } from '../components/Avatar';
 import type { AiSetup } from '../game/useGame';
 
 interface MainMenuProps {
@@ -14,6 +16,11 @@ interface MainMenuProps {
     ai: AiSetup;
   }) => void;
   onPlayOnline: () => void;
+  onSignIn: () => void;
+  onRegister: () => void;
+  onProfile: () => void;
+  onSettings: () => void;
+  onLogout: () => void;
 }
 
 const DIFFS: { v: Difficulty; label: string }[] = [
@@ -63,7 +70,15 @@ function Seg<T extends string | number>({
   );
 }
 
-export function MainMenu({ onStart, onPlayOnline }: MainMenuProps) {
+export function MainMenu({
+  onStart,
+  onPlayOnline,
+  onSignIn,
+  onRegister,
+  onProfile,
+  onSettings,
+  onLogout,
+}: MainMenuProps) {
   const [name, setName] = useState('Skipper');
   const [seedText, setSeedText] = useState('');
   const [showRules, setShowRules] = useState(false);
@@ -73,6 +88,9 @@ export function MainMenu({ onStart, onPlayOnline }: MainMenuProps) {
 
   const seed = seedText.trim() === '' ? undefined : Number(seedText) || undefined;
   const ai: AiSetup = { count: aiCount, difficulty, personality };
+
+  const { user, status, authEnabled } = useAuth();
+  const signedIn = status === 'user' && !!user;
 
   return (
     <div className="if-menu">
@@ -135,12 +153,50 @@ export function MainMenu({ onStart, onPlayOnline }: MainMenuProps) {
         </details>
 
         <div className="if-menu__btns">
-          <button
-            className="if-btn if-btn--primary if-btn--lg"
-            onClick={() => onStart({ name: name.trim() || 'Skipper', seed, autopilot: false, ai })}
-          >
-            Set Sail — Play vs {aiCount} AI
-          </button>
+          {signedIn ? (
+            <>
+              <button
+                className="if-btn if-btn--primary if-btn--lg"
+                onClick={() => onStart({ name: user.displayName, seed, autopilot: false, ai })}
+              >
+                Play Local
+              </button>
+              <button className="if-btn if-btn--primary if-btn--lg" onClick={onPlayOnline}>
+                Play Online
+              </button>
+              <button className="if-btn if-btn--ghost" onClick={onProfile}>
+                Profile
+              </button>
+              <button className="if-btn if-btn--ghost" onClick={onSettings}>
+                Settings
+              </button>
+              <button className="if-btn if-btn--ghost" onClick={onLogout}>
+                Log Out
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="if-btn if-btn--primary if-btn--lg"
+                onClick={() => onStart({ name: name.trim() || 'Skipper', seed, autopilot: false, ai })}
+              >
+                Play Local
+              </button>
+              <button className="if-btn if-btn--ghost" onClick={onPlayOnline}>
+                Play Online as Guest
+              </button>
+              {authEnabled && (
+                <>
+                  <button className="if-btn if-btn--ghost" onClick={onSignIn}>
+                    Sign In
+                  </button>
+                  <button className="if-btn if-btn--ghost" onClick={onRegister}>
+                    Create Account
+                  </button>
+                </>
+              )}
+            </>
+          )}
           <button
             className="if-btn if-btn--ghost"
             onClick={() =>
@@ -149,15 +205,18 @@ export function MainMenu({ onStart, onPlayOnline }: MainMenuProps) {
           >
             Watch AI Battle
           </button>
-          <button className="if-btn if-btn--primary if-btn--lg" onClick={onPlayOnline}>
-            Play Online — Real Rivals
-          </button>
           <button className="if-btn if-btn--ghost" onClick={() => setShowRules}>
             How to Play
           </button>
         </div>
         <p className="if-menu__note">
-          Local play · Online multiplayer · No account needed
+          {signedIn ? (
+            <span className="if-menu__user">
+              <Avatar id={user.avatarId} size={20} /> {user.displayName} · @{user.username}
+            </span>
+          ) : (
+            'Local play · Online as guest · No account needed'
+          )}
         </p>
       </div>
 

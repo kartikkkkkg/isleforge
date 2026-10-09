@@ -123,7 +123,10 @@ export interface UseMultiplayer {
   clearError: () => void;
 }
 
-export function useMultiplayer(url: string): UseMultiplayer {
+export function useMultiplayer(
+  url: string,
+  opts: { getAccessToken?: () => string | null } = {},
+): UseMultiplayer {
   const [connection, setConnection] = useState<ConnectionHealth>('disconnected');
   const [room, setRoom] = useState<RoomView | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -201,6 +204,7 @@ export function useMultiplayer(url: string): UseMultiplayer {
         case 'PLAYER_JOINED':
         case 'PLAYER_LEFT':
         case 'COMMAND_ACCEPTED':
+        case 'AUTHENTICATED':
           break;
       }
     };
@@ -213,6 +217,12 @@ export function useMultiplayer(url: string): UseMultiplayer {
       sock.onopen = () => {
         retryMs = 500;
         setConnection('connected');
+        // M5: authenticate the socket when signed in. The server verifies
+        // the token itself; guests simply skip this.
+        const token = opts.getAccessToken?.();
+        if (token) {
+          sock.send(JSON.stringify({ v: 1, type: 'AUTHENTICATE', accessToken: token }));
+        }
         // Resume a previous session if we have one for this server.
         const stored = loadSession();
         const sid = sessionRef.current ?? (stored?.url === url ? stored.sessionId : null);

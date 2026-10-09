@@ -2,6 +2,11 @@ import { useCallback, useState } from 'react';
 import { MainMenu } from './screens/MainMenu';
 import { GameScreen } from './screens/GameScreen';
 import { OnlineGameFlow } from './screens/OnlineGame';
+import { LoginScreen } from './screens/LoginScreen';
+import { RegisterScreen } from './screens/RegisterScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
+import { AuthProvider, useAuth } from './game/useAuth';
 import { buildSeats, type AiSetup, type Seat } from './game/useGame';
 import './styles/tokens.css';
 import './styles/app.css';
@@ -22,8 +27,12 @@ const serverUrl = (): string => {
   return new URLSearchParams(window.location.search).get('server') ?? 'ws://localhost:8080';
 };
 
-export default function App() {
+type Screen = 'menu' | 'login' | 'register' | 'profile' | 'settings';
+
+function Shell() {
   const [online, setOnline] = useState(false);
+  const [screen, setScreen] = useState<Screen>('menu');
+  const { logout } = useAuth();
   const [session, setSession] = useState<Session | null>(() => {
     // Deep-link support: ?autopilot=1[&seed=N][&fast=1] boots straight into a game (E2E + demos).
     if (typeof window === 'undefined') return null;
@@ -56,10 +65,54 @@ export default function App() {
     window.history.replaceState(null, '', window.location.pathname);
   }, []);
 
+  const goMenu = useCallback(() => {
+    setScreen('menu');
+    setOnline(false);
+  }, []);
+
   if (online) {
     return <OnlineGameFlow serverUrl={serverUrl()} onQuit={() => setOnline(false)} />;
   }
-  if (!session) return <MainMenu onStart={start} onPlayOnline={() => setOnline(true)} />;
+  if (screen === 'login') {
+    return (
+      <LoginScreen
+        onDone={goMenu}
+        onSwitchToRegister={() => setScreen('register')}
+        onBack={goMenu}
+      />
+    );
+  }
+  if (screen === 'register') {
+    return (
+      <RegisterScreen
+        onDone={goMenu}
+        onSwitchToLogin={() => setScreen('login')}
+        onBack={goMenu}
+      />
+    );
+  }
+  if (screen === 'profile') {
+    return <ProfileScreen onBack={goMenu} onOpenSettings={() => setScreen('settings')} />;
+  }
+  if (screen === 'settings') {
+    return <SettingsScreen onBack={goMenu} />;
+  }
+  if (!session) {
+    return (
+      <MainMenu
+        onStart={start}
+        onPlayOnline={() => setOnline(true)}
+        onSignIn={() => setScreen('login')}
+        onRegister={() => setScreen('register')}
+        onProfile={() => setScreen('profile')}
+        onSettings={() => setScreen('settings')}
+        onLogout={() => {
+          void logout();
+          goMenu();
+        }}
+      />
+    );
+  }
   return (
     <GameScreen
       key={`${session.autopilot}-${session.seed ?? 'random'}-${session.seats.map((s) => s.name).join(',')}`}
@@ -68,5 +121,13 @@ export default function App() {
       autopilot={session.autopilot}
       onQuit={quit}
     />
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider serverUrl={serverUrl()}>
+      <Shell />
+    </AuthProvider>
   );
 }

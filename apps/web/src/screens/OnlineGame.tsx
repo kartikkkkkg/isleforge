@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useMultiplayer } from '../game/useMultiplayerGame';
+import { useAuth } from '../game/useAuth';
 import { OnlineLobby } from './OnlineLobby';
 import { GameScreen } from './GameScreen';
 
@@ -12,7 +13,9 @@ export function OnlineGameFlow({
   serverUrl: string;
   onQuit: () => void;
 }) {
-  const mp = useMultiplayer(serverUrl);
+  const { accessToken } = useAuth();
+  const getAccessToken = useCallback(() => accessToken, [accessToken]);
+  const mp = useMultiplayer(serverUrl, { getAccessToken });
 
   const quitToMenu = useCallback(() => {
     mp.leaveRoom();

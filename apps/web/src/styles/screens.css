@@ -1170,3 +1170,59 @@
 /* Chat messages (online). */
 .if-chat__msg { font-size: 13px; line-height: 1.45; margin-bottom: 6px; }
 .if-chat__msg b { color: var(--if-gold-bright); font-weight: 600; }
+
+/* ── Auth (Milestone 5) ────────────────────────────────────────── */
+.if-auth__card { display: flex; flex-direction: column; gap: 14px; }
+.if-avatar { border-radius: 50%; flex: none; }
+.if-avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+@media (max-width: 560px) {
+  .if-avatar-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.if-avatar-pick {
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  padding: 4px;
+  cursor: pointer;
+  line-height: 0;
+}
+.if-avatar-pick--on { border-color: var(--if-gold-bright); }
+.if-avatar-pick:focus-visible {
+  outline: 2px solid var(--if-gold-bright);
+  outline-offset: 2px;
+}
+.if-profile__head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.if-profile__name { font-size: 22px; font-weight: 700; color: var(--if-text); }
+.if-profile__sub { font-size: 14px; color: var(--if-muted); }
+.if-profile__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 0;
+}
+.if-profile__facts > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--if-line);
+  border-radius: 10px;
+}
+.if-profile__facts dt { color: var(--if-muted); font-size: 13px; }
+.if-profile__facts dd { margin: 0; font-size: 15px; color: var(--if-text); }
+.if-profile__muted { color: var(--if-muted); font-style: italic; }
+.if-menu__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
