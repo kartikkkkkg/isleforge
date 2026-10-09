@@ -129,3 +129,21 @@ npm run e2e         # Playwright: critical flows (desktop + mobile viewports)
 - **Manual multi-browser**: `npm run dev:server` + `npm run dev:web`, open
   2–4 windows (or LAN devices via `?server=ws://<host>:8080`), create/join by
   code, ready, start — verified during M4 development.
+
+## Authentication testing (M5)
+
+- **Database** (`packages/db/tests/db.test.ts`): migrations apply once,
+  users/profiles CRUD, session rotation, audit-log secret guard — isolated
+  embedded PostgreSQL.
+- **Auth API** (`apps/server/tests/auth.test.ts`, 20 tests): registration
+  (valid/duplicate/invalid/reserved/weak), login (email+username,
+  no-enumeration, HttpOnly cookie, lockout), sessions (rotation, logout,
+  logout-all, `/auth/me`), profile updates, password reset (single-use,
+  no-enumeration).
+- **WebSocket auth** (`tests/auth-ws.test.ts`): `AUTHENTICATE` binds userId,
+  seats record the owner, bad tokens rejected, guests still play,
+  cross-user `RECONNECT` rejected, owner reclaim works.
+- **Auth security** (`tests/auth-security.test.ts`): SQL injection payloads,
+  malformed/oversized bodies, refresh-token replay → family revocation,
+  forged user ids impossible (no userId parameter), audit log contains no
+  secrets, login rate limiting, password-reset enumeration resistance.

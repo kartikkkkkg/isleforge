@@ -8,9 +8,10 @@ isleforge/
     game-engine/      # M1 ✅ — deterministic rules engine
     ai/               # M3 ✅ — AI opponents (difficulties × personalities)
     protocol/         # M4 ✅ — versioned WS protocol + runtime validators
+    db/               # M5 ✅ — PostgreSQL: migrations + typed repositories
   apps/
-    web/              # M2 ✅ / M4 ✅ — browser game UI (Vite + React + TS)
-    server/           # M4 ✅ — authoritative multiplayer server (Node + ws)
+    web/              # M2 ✅ / M4 ✅ / M5 ✅ — browser game UI (Vite + React + TS)
+    server/           # M4 ✅ / M5 ✅ — authoritative multiplayer server (Node + ws)
 ```
 
 `packages/game-engine` has **zero runtime dependencies** and imports nothing
@@ -41,11 +42,26 @@ with server-AI takeover keeps games moving. Full design:
 | `roomCode.ts` | Human-friendly room codes (`A7K9P`) |
 | `ratelimit.ts` | Per-category flood protection |
 | `protocol` pkg | Message types + runtime validators (shared with the web client) |
+| `auth/` | M5 ✅ — `AuthService` (register/login/refresh/logout), scrypt, JWTs, HTTP router |
 
 The web client consumes the same `GameScreen` through the `GameApiLike`
 interface: `useIsleforgeGame` (local) and `useMultiplayerGame` (online) are
 interchangeable adapters — local game, online game, and (later)
 replay/spectator share components.
+
+## Authentication (M5)
+
+Identity (`User`) is separate from game participation. `packages/db`
+(`@isleforge/db`) owns PostgreSQL: versioned migrations
+(`users`, `account_profiles`, `sessions`, `password_resets`,
+`email_verifications`, `auth_audit_log`) + typed repositories. The server
+adds an HTTP auth API (`/auth/*`: register, login, logout, refresh, me,
+profile, sessions, password reset) and WebSocket `AUTHENTICATE`:
+the server verifies the access token itself and binds `conn.userId`;
+seats record the owner, and `RECONNECT` is rejected for a different user.
+Passwords use scrypt; sessions are short-lived JWT access tokens + rotating
+opaque refresh tokens (HttpOnly cookie) with reuse detection. Guests keep
+working as in M4. Full design: `AUTH_ARCHITECTURE.md`.
 
 ## Engine module map
 

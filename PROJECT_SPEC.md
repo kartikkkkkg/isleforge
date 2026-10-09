@@ -56,6 +56,39 @@ Delivered:
   connection indicator, chat wired into `ChatPanel`
 - no public matchmaking, accounts, or production deployment (later milestones)
 
+## Milestone 5 — Authentication & persistent accounts ✅ COMPLETE (2026-10-09)
+
+Identity (`User`) is separate from game participation. `packages/db`
+(`@isleforge/db`) owns PostgreSQL: versioned migrations (`users`,
+`account_profiles`, `sessions`, `password_resets`, `email_verifications`,
+`auth_audit_log`) + typed repositories. The server adds an HTTP auth API
+(`/auth/*`: register, login, logout, refresh, me, profile, sessions,
+password reset, email verification) and WebSocket `AUTHENTICATE`.
+
+Delivered:
+
+- email registration (normalized, validated, unique email + username),
+  scrypt password hashing, strength gate, reserved usernames
+- sessions: 15-min JWT access tokens + rotating opaque refresh tokens
+  (HttpOnly `SameSite=Lax` cookie, `Secure` in production), reuse detection
+  revokes the token family, logout / logout-all
+- brute-force protection: per-account exponential backoff + temporary
+  lockout; dedicated `auth_*` rate limits; no account enumeration in
+  login or password-reset responses
+- WS auth: server verifies the access token, binds `conn.userId`; seats
+  record the owner; `RECONNECT` rejects a different user
+- usernames (unique, case-insensitive) vs display names (changeable);
+  8 built-in original avatar SVGs
+- web UI: Login / Register / Profile / Settings screens, session list,
+  auth-aware main menu; guests keep playing as in M4
+- audit log with a secret-guard (passwords/tokens can never be logged)
+- 35 new tests (db 4, auth API 20, WS auth 4, auth security 7), all passing;
+  M1–M4 suites still green
+
+Full design: `AUTH_ARCHITECTURE.md`. Out of scope (later milestones):
+friends, matchmaking, MMR, leaderboards, achievements, cosmetics economy,
+payments, seasons, public discovery.
+
 ## Milestone 3 — AI opponents ✅ COMPLETE (2026-10-08)
 
 Strategic AI in `packages/ai` (`@isleforge/ai` — no React, zero runtime deps

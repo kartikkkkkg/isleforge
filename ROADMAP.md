@@ -10,7 +10,7 @@
 | 2 | Game UI | ✅ Done 2026-10-08 — `apps/web`, playable vs 3 bots, 18 UI tests + E2E |
 | 3 | AI opponents | ✅ Done 2026-10-08 — `packages/ai`: 4 difficulties × 5 personalities, simulation-validated |
 | 4 | Realtime multiplayer infrastructure | ✅ Done 2026-10-09 — `apps/server` (authoritative WS) + `packages/protocol`; rooms/lobbies, reconnect, server AI, chat foundation, online UI |
-| 5 | Authentication | ⬜ Email/Google/Discord/Apple; profiles (username, avatar, rating, stats) |
+| 5 | Authentication | ✅ Done 2026-10-09 — `packages/db` (PostgreSQL, migrations) + auth in `apps/server` (scrypt, JWT access + rotating refresh, WS AUTHENTICATE, seat authz); Login/Register/Profile/Settings UI; 35 auth/security tests |
 | 6 | Casual matchmaking | ⬜ Queue → compatible players → game |
 | 7 | Ranked/MMR | ⬜ Bronze→Grandmaster, transparent rating, leaderboards, seasons, rank + match history |
 | 8 | Replay system | ⬜ Viewer on the event log: play/pause/speeds/step/timeline/stats, shareable `/replay/:id` |
