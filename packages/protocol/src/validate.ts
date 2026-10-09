@@ -356,6 +356,10 @@ export function parseClientMessage(data: unknown, byteLength?: number): ParseRes
       return { ok: true, message: { v: 1, type: 'QUEUE_LEAVE' } };
     case 'QUEUE_STATUS':
       return { ok: true, message: { v: 1, type: 'QUEUE_STATUS' } };
+    case 'SOCIAL_SUBSCRIBE':
+      return { ok: true, message: { v: 1, type: 'SOCIAL_SUBSCRIBE' } };
+    case 'SOCIAL_UNSUBSCRIBE':
+      return { ok: true, message: { v: 1, type: 'SOCIAL_UNSUBSCRIBE' } };
     default:
       return fail('INVALID_MESSAGE', `Unhandled message type: ${type}.`);
   }

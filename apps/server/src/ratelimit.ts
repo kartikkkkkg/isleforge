@@ -38,6 +38,12 @@ export const DEFAULT_LIMITS: Record<string, RateLimit> = {
   auth_ws: { windowMs: 60_000, max: 10 },
   /** Matchmaking: queue operations per connection. */
   matchmaking: { windowMs: 60_000, max: 20 },
+  /** M9 social: player search per user. */
+  social_search: { windowMs: 60_000, max: 30 },
+  /** M9 social: friend requests per user. */
+  social_friend_request: { windowMs: 60_000, max: 10 },
+  /** M9 social: game invitations per user. */
+  social_invite: { windowMs: 60_000, max: 10 },
 };
 
 export class RateLimiter {

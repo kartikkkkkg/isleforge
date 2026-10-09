@@ -126,6 +126,9 @@ export class HttpClient {
   post(path: string, body?: unknown, headers?: Record<string, string>) {
     return this.request('POST', path, body, headers);
   }
+  delete(path: string, headers?: Record<string, string>) {
+    return this.request('DELETE', path, undefined, headers);
+  }
   patch(path: string, body?: unknown, headers?: Record<string, string>) {
     return this.request('PATCH', path, body, headers);
   }

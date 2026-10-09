@@ -56,6 +56,24 @@ Delivered:
   connection indicator, chat wired into `ChatPanel`
 - no public matchmaking, accounts, or production deployment (later milestones)
 
+## Milestone 9 — Friends, presence & social play ✅ COMPLETE (2026-10-09)
+
+Social infrastructure on top of M4–M8.
+
+Delivered:
+
+- migration 004_social: friendships, blocks, social_notifications, game_invites
+- friendship API: search, requests (send/accept/decline/cancel), remove, mutual auto-accept
+- blocking: removes friendships, prevents requests/invites, hidden from search
+- presence: server-authoritative, multi-tab correct, 15s grace, IN_GAME activity
+- WS: SOCIAL_SUBSCRIBE, PRESENCE_UPDATE, SOCIAL_NOTIFICATION, etc.
+- game invitations: 5-min expiry, duplicate collapse, room validation
+- web: Friends screen, notifications panel, Invite Friends in lobby
+- 21 new tests (friendship 12, presence 3, invites 5, E2E 1)
+
+Docs: `docs/SOCIAL_ARCHITECTURE.md`.
+Out of scope: seasons, tournaments, parties, achievements, voice, push.
+
 ## Milestone 8 — Ranked + leaderboards + replays ✅ COMPLETE (2026-10-09)
 
 Competitive layer on top of M7.

@@ -10,6 +10,8 @@ import { MatchmakingScreen } from './screens/MatchmakingScreen';
 import { MatchmadeGameFlow } from './screens/MatchmadeGame';
 import { ReplayScreen } from './screens/ReplayScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
+import { FriendsScreen } from './screens/FriendsScreen';
+import { NotificationsPanel, useNotifications } from './components/Notifications';
 import { GameDetailScreen } from './screens/GameDetailScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AuthProvider, useAuth } from './game/useAuth';
@@ -33,7 +35,7 @@ const serverUrl = (): string => {
   return new URLSearchParams(window.location.search).get('server') ?? 'ws://localhost:8080';
 };
 
-type Screen = 'menu' | 'login' | 'register' | 'profile' | 'settings' | 'history' | 'game-detail' | 'matchmaking' | 'matchmade-game' | 'replay' | 'leaderboard';
+type Screen = 'menu' | 'login' | 'register' | 'profile' | 'settings' | 'history' | 'game-detail' | 'matchmaking' | 'matchmade-game' | 'replay' | 'leaderboard' | 'friends';
 
 function Shell() {
   const [online, setOnline] = useState(false);
@@ -130,6 +132,17 @@ function Shell() {
   if (screen === 'leaderboard') {
     return <LeaderboardScreen onBack={goMenu} />;
   }
+  if (screen === 'friends') {
+    return (
+      <FriendsScreen
+        onBack={goMenu}
+        onInvite={(userId) => {
+          // TODO: invite from lobby (M9 lobby integration)
+          window.alert('Invite friends from a private room lobby.');
+        }}
+      />
+    );
+  }
   if (screen === 'matchmaking') {
     return (
       <MatchmakingScreen
@@ -165,6 +178,7 @@ function Shell() {
           setScreen('matchmaking');
         }}
         onLeaderboard={() => setScreen('leaderboard')}
+        onFriends={() => setScreen('friends')}
         onSignIn={() => setScreen('login')}
         onRegister={() => setScreen('register')}
         onProfile={() => setScreen('profile')}

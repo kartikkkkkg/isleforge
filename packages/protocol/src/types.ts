@@ -80,7 +80,10 @@ export type ErrorCode =
   | 'RATE_LIMITED'
   | 'NAME_TAKEN'
   | 'DUPLICATE_COMMAND'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  | 'NOT_AUTHENTICATED'
+  | 'INVITE_EXPIRED'
+  | 'INVITE_NOT_FOUND';
 
 /* ------------------------------------------------------------------ */
 /* Rooms                                                              */
@@ -148,7 +151,9 @@ export type ClientMessage =
   | { v: 1; type: 'AUTHENTICATE'; accessToken: string }
   | { v: 1; type: 'QUEUE_JOIN'; mode?: 'CASUAL' | 'RANKED' }
   | { v: 1; type: 'QUEUE_LEAVE' }
-  | { v: 1; type: 'QUEUE_STATUS' };
+  | { v: 1; type: 'QUEUE_STATUS' }
+  | { v: 1; type: 'SOCIAL_SUBSCRIBE' }
+  | { v: 1; type: 'SOCIAL_UNSUBSCRIBE' };
 
 export const CLIENT_MESSAGE_TYPES: readonly string[] = [
   'CREATE_ROOM',
@@ -166,6 +171,8 @@ export const CLIENT_MESSAGE_TYPES: readonly string[] = [
   'QUEUE_JOIN',
   'QUEUE_LEAVE',
   'QUEUE_STATUS',
+  'SOCIAL_SUBSCRIBE',
+  'SOCIAL_UNSUBSCRIBE',
 ];
 
 /* ------------------------------------------------------------------ */
@@ -225,7 +232,29 @@ export type ServerMessage =
       players: { userId: string; displayName: string }[];
     }
   | { v: 1; type: 'MATCH_STARTING'; roomCode: string; sessionId: string; playerId: string }
-  | { v: 1; type: 'MATCH_ERROR'; code: string; message: string };
+  | { v: 1; type: 'MATCH_ERROR'; code: string; message: string }
+  | { v: 1; type: 'SOCIAL_SUBSCRIBED' }
+  | { v: 1; type: 'SOCIAL_UNSUBSCRIBED' }
+  | {
+      v: 1;
+      type: 'PRESENCE_UPDATE';
+      userId: string;
+      state: 'OFFLINE' | 'ONLINE' | 'IN_GAME';
+      activity: string;
+    }
+  | { v: 1; type: 'SOCIAL_NOTIFICATION'; kind: string; payload: unknown }
+  | {
+      v: 1;
+      type: 'FRIEND_REQUEST_RECEIVED';
+      requestId: string;
+      from: { userId: string; username: string; displayName: string };
+    }
+  | {
+      v: 1;
+      type: 'FRIEND_REQUEST_ACCEPTED';
+      by: { userId: string; username: string; displayName: string };
+    }
+  | { v: 1; type: 'FRIEND_REMOVED'; byUserId: string };
 
 /* ------------------------------------------------------------------ */
 /* Chat                                                               */

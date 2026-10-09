@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Difficulty } from '@isleforge/protocol';
 import type { UseMultiplayer } from '../game/useMultiplayerGame';
+import { InviteFriends } from '../components/InviteFriends';
 
 const DIFFS: { v: Difficulty; label: string }[] = [
   { v: 'easy', label: 'Easy' },
@@ -152,6 +153,7 @@ export function OnlineLobby({
         <h1 className="if-menu__title">ISLEFORGE</h1>
         <p className="if-menu__tag">Room {room.code}</p>
         <p className="if-menu__sub">Share the code — friends join from the menu.</p>
+        <InviteFriends roomCode={room.code} />
       </div>
       <div className="if-panel if-menu__card">
         <div className="if-lobby__connrow">

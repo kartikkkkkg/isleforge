@@ -30,3 +30,16 @@ export type {
   EmailVerificationRow,
   PublicAccount,
 } from './types.js';
+
+export {
+  FriendshipsRepo,
+  BlocksRepo,
+  NotificationsRepo,
+  InvitesRepo,
+  type FriendshipStatus,
+  type FriendshipRow,
+  type NotificationType,
+  type NotificationRow,
+  type InviteStatus,
+  type InviteRow,
+} from './repos/social.js';

@@ -1364,3 +1364,40 @@
 .rank-tier { font-size: 28px; font-weight: 800; }
 .rank-progress { height: 8px; background: var(--if-line); border-radius: 999px; margin: 8px 0; overflow: hidden; }
 .rank-progress > div { height: 100%; background: var(--if-accent); transition: width 0.3s; }
+
+/* M9: social */
+.friends-screen { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
+.friends-screen section { margin: 24px 0; }
+.friends-screen h2 { font-size: 18px; margin: 0 0 12px; }
+.friend-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.friend-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--if-line); border-radius: 10px;
+}
+.friend-info { flex: 1; display: flex; flex-direction: column; }
+.friend-name { font-weight: 600; }
+.friend-meta { font-size: 13px; color: var(--if-muted); }
+.friend-actions { display: flex; gap: 6px; }
+.friend-actions button.small { padding: 6px 10px; font-size: 12px; }
+.friend-actions button.danger { color: #c00; border-color: #c00; }
+.search-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+.search-bar input { flex: 1; padding: 10px 12px; border: 1px solid var(--if-line); border-radius: 8px; }
+.notifications-panel {
+  position: fixed; top: 64px; right: 16px; width: 360px; max-height: 70vh;
+  overflow-y: auto; background: var(--if-panel); border: 1px solid var(--if-line);
+  border-radius: 12px; padding: 16px; z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+.notifications-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.notifications-header h2 { margin: 0; font-size: 16px; }
+.unread-badge {
+  display: inline-block; min-width: 20px; height: 20px; line-height: 20px;
+  text-align: center; font-size: 12px; font-weight: 700; color: #fff;
+  background: var(--if-accent); border-radius: 999px; padding: 0 6px;
+}
+.notification-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.notification-list li {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px; border: 1px solid var(--if-line); border-radius: 8px;
+}
+.notification-list li.unread { border-color: var(--if-accent); background: rgba(0,0,0,0.02); }
+.notification-body { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }

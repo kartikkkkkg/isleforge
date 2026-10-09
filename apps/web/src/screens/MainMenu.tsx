@@ -18,6 +18,7 @@ interface MainMenuProps {
   onPlayOnline: () => void;
   onPlayMatchmaking: (mode: 'CASUAL' | 'RANKED') => void;
   onLeaderboard: () => void;
+  onFriends: () => void;
   onSignIn: () => void;
   onRegister: () => void;
   onProfile: () => void;
@@ -77,6 +78,7 @@ export function MainMenu({
   onPlayOnline,
   onPlayMatchmaking,
   onLeaderboard,
+  onFriends,
   onSignIn,
   onRegister,
   onProfile,
@@ -183,6 +185,9 @@ export function MainMenu({
               </button>
               <button className="if-btn if-btn--ghost" onClick={onLeaderboard}>
                 Leaderboard
+              </button>
+              <button className="if-btn if-btn--ghost" onClick={onFriends}>
+                Friends
               </button>
               <button className="if-btn if-btn--ghost" onClick={onSettings}>
                 Settings

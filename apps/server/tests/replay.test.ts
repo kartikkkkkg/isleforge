@@ -8,10 +8,10 @@ import { Game, replayEvents, type GameEvent } from '@isleforge/game-engine';
 function playDemoGame(seed: number): GameEvent[] {
   const game = new Game({
     players: [
-      { id: 'p1', name: 'A', color: 'red' },
-      { id: 'p2', name: 'B', color: 'blue' },
-      { id: 'p3', name: 'C', color: 'green' },
-      { id: 'p4', name: 'D', color: 'yellow' },
+      { id: 'p1', name: 'A', color: 'ember' },
+      { id: 'p2', name: 'B', color: 'tide' },
+      { id: 'p3', name: 'C', color: 'moss' },
+      { id: 'p4', name: 'D', color: 'dune' },
     ],
     seed,
   });

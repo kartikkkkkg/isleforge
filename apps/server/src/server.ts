@@ -35,7 +35,12 @@ import { createHistoryRouter } from './history/http.js';
 import { GameRecorder, type RecorderSeat } from './history/recorder.js';
 import { Matchmaker, DEFAULT_MATCHMAKING_CONFIG, type FormedMatch } from './matchmaking/queue.js';
 import { computeDeltas, type EloPlayer } from './rating/elo.js';
-import { getPool, migrate, RatingsRepo, UsersRepo } from '@isleforge/db';
+import { PresenceManager, type PresenceInfo } from './social/presence.js';
+import { createSocialRouter } from './social/http.js';
+import {
+  getPool, migrate, RatingsRepo, UsersRepo,
+  FriendshipsRepo, BlocksRepo, NotificationsRepo, InvitesRepo,
+} from '@isleforge/db';
 import type { Pool } from 'pg';
 
 export interface ServerOptions {
@@ -106,6 +111,15 @@ export class IsleforgeServer {
   private matchmaker: Matchmaker | null = null;
   private ratingsRepo: RatingsRepo | null = null;
   private usersRepo: UsersRepo | null = null;
+  /** M9: social. Present when a DB pool is available. */
+  private presence = new PresenceManager();
+  private friendshipsRepo: FriendshipsRepo | null = null;
+  private blocksRepo: BlocksRepo | null = null;
+  private notificationsRepo: NotificationsRepo | null = null;
+  private invitesRepo: InvitesRepo | null = null;
+  private socialRouter: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
+  /** conn.id -> userId for social subscriptions (rebuilt on reconnect). */
+  private socialSubs = new Map<string, string>();
 
   constructor(private opts: ServerOptions) {
     this.graceMs = opts.reconnectGraceMs ?? DEFAULT_GRACE_MS;
@@ -149,6 +163,46 @@ export class IsleforgeServer {
       // M7: matchmaking uses the same pool.
       this.matchmaker = new Matchmaker(DEFAULT_MATCHMAKING_CONFIG, (m) => this.onMatchFound(m));
       this.matchmaker.start();
+      // M9: social repos + router.
+      this.friendshipsRepo = new FriendshipsRepo(this.dbPool);
+      this.blocksRepo = new BlocksRepo(this.dbPool);
+      this.notificationsRepo = new NotificationsRepo(this.dbPool);
+      this.invitesRepo = new InvitesRepo(this.dbPool);
+      this.socialRouter = createSocialRouter({
+        pool: this.dbPool,
+        friendships: this.friendshipsRepo,
+        blocks: this.blocksRepo,
+        notifications: this.notificationsRepo,
+        invites: this.invitesRepo,
+        ratings: this.ratingsRepo,
+        users: this.usersRepo,
+        verifyToken: (token) => {
+          const payload = verifyAccessToken(secret, token);
+          return payload ? { userId: payload.sub } : null;
+        },
+        checkRateLimit: (key, category) => this.limiter.check(key, category),
+        clientKey: (req) => {
+          const fwd = req.headers['x-forwarded-for'];
+          const ip = (Array.isArray(fwd) ? fwd[0] : fwd?.split(',')[0])?.trim();
+          return ip || req.socket.remoteAddress || 'unknown';
+        },
+        hooks: {
+          notifyUser: (userId, type, payload) => this.pushSocialNotification(userId, type, payload),
+          onFriendshipChanged: (a, b) => {
+            // Push fresh presence to both parties (they can now see each other).
+            void this.pushPresenceTo(a, b);
+            void this.pushPresenceTo(b, a);
+          },
+        },
+        roomAccess: {
+          canInvite: (roomCode, userId) => this.canInviteFromRoom(roomCode, userId),
+          roomJoinable: (roomCode) => this.checkRoomJoinable(roomCode),
+        },
+      });
+      // Fan presence changes out to subscribed friends.
+      this.presence.onChange((userId, info) => {
+        void this.broadcastPresence(userId, info);
+      });
       const router = createAuthRouter(this.authService, secret, {
         secureCookies: this.opts.auth.secureCookies ?? false,
         devExposeResetTokens: this.opts.auth.devExposeResetTokens ?? false,
@@ -164,13 +218,15 @@ export class IsleforgeServer {
     }
 
     this.http = createServer((req, res) => {
-      if (this.authRouter || this.historyRouter) {
+      if (this.authRouter || this.historyRouter || this.socialRouter) {
         // API routes are async; fire and let them respond.
         const authRouter = this.authRouter;
         const historyRouter = this.historyRouter;
+        const socialRouter = this.socialRouter;
         void (async () => {
           if (authRouter && (await authRouter(req, res))) return;
           if (historyRouter && (await historyRouter(req, res))) return;
+          if (socialRouter && (await socialRouter(req, res))) return;
           res.writeHead(200, { 'content-type': 'text/plain' });
           res.end('isleforge multiplayer server\n');
         })().catch(() => {
@@ -276,6 +332,9 @@ export class IsleforgeServer {
 
   private onClose(conn: Conn): void {
     this.conns.delete(conn.id);
+    this.socialSubs.delete(conn.id);
+    // M9: presence (grace period handles reconnects).
+    if (conn.userId) this.presence.disconnect(conn.userId, conn.id);
     // M7: drop queue entries when their last watching connection closes.
     this.onConnQueueCleanup(conn);
     if (conn.replaced) return;
@@ -398,6 +457,12 @@ export class IsleforgeServer {
       case 'QUEUE_STATUS':
         this.onQueueStatus(conn);
         break;
+      case 'SOCIAL_SUBSCRIBE':
+        this.onSocialSubscribe(conn);
+        break;
+      case 'SOCIAL_UNSUBSCRIBE':
+        this.onSocialUnsubscribe(conn);
+        break;
     }
   }
 
@@ -429,6 +494,8 @@ export class IsleforgeServer {
       return;
     }
     conn.userId = claims.sub;
+    // M9: track presence (multi-tab: stays ONLINE until last conn closes).
+    this.presence.connect(claims.sub, conn.id);
     this.send(conn, { v: 1, type: 'AUTHENTICATED', userId: claims.sub });
   }
 
@@ -651,6 +718,118 @@ export class IsleforgeServer {
   /* M7: matchmaking                                                */
   /* ---------------------------------------------------------------- */
 
+  /* ---------------------------------------------------------------- */
+  /* Social (M9)                                                        */
+  /* ---------------------------------------------------------------- */
+
+  /** Push a realtime social notification to all of a user's connections. */
+  private pushSocialNotification(userId: string, kind: string, payload: unknown): void {
+    for (const conn of this.conns.values()) {
+      if (conn.userId === userId) {
+        this.send(conn, { v: 1, type: 'SOCIAL_NOTIFICATION', kind, payload });
+      }
+    }
+  }
+
+  /** Send one user's presence to another (if they're friends and not blocked). */
+  private async pushPresenceTo(viewerId: string, targetId: string): Promise<void> {
+    if (!this.friendshipsRepo || !this.blocksRepo) return;
+    const rel = await this.friendshipsRepo.between(viewerId, targetId);
+    if (!rel || rel.status !== 'ACCEPTED') return;
+    if (await this.blocksRepo.isBlocked(viewerId, targetId)) return;
+    const info = this.presence.get(targetId);
+    for (const conn of this.conns.values()) {
+      if (conn.userId === viewerId && this.socialSubs.has(conn.id)) {
+        this.send(conn, {
+          v: 1,
+          type: 'PRESENCE_UPDATE',
+          userId: targetId,
+          state: info.state,
+          activity: info.activity,
+        });
+      }
+    }
+  }
+
+  /** Broadcast a user's presence to all subscribed friends. */
+  private async broadcastPresence(userId: string, info: PresenceInfo): Promise<void> {
+    if (!this.friendshipsRepo || !this.blocksRepo) return;
+    const friendIds = await this.friendshipsRepo.friendIds(userId);
+    for (const fid of friendIds) {
+      if (await this.blocksRepo.isBlocked(userId, fid)) continue;
+      for (const conn of this.conns.values()) {
+        if (conn.userId === fid && this.socialSubs.has(conn.id)) {
+          this.send(conn, {
+            v: 1,
+            type: 'PRESENCE_UPDATE',
+            userId,
+            state: info.state,
+            activity: info.activity,
+          });
+        }
+      }
+    }
+  }
+
+  private onSocialSubscribe(conn: Conn): void {
+    if (!conn.userId || !this.friendshipsRepo) {
+      this.sendError(conn, 'NOT_AUTHENTICATED', 'Sign in to use social features.');
+      return;
+    }
+    this.socialSubs.set(conn.id, conn.userId);
+    this.send(conn, { v: 1, type: 'SOCIAL_SUBSCRIBED' });
+    // Send current presence of all friends.
+    void (async () => {
+      const friendIds = await this.friendshipsRepo!.friendIds(conn.userId!);
+      for (const fid of friendIds) {
+        if (await this.blocksRepo!.isBlocked(conn.userId!, fid)) continue;
+        const info = this.presence.get(fid);
+        this.send(conn, {
+          v: 1,
+          type: 'PRESENCE_UPDATE',
+          userId: fid,
+          state: info.state,
+          activity: info.activity,
+        });
+      }
+    })();
+  }
+
+  private onSocialUnsubscribe(conn: Conn): void {
+    this.socialSubs.delete(conn.id);
+    this.send(conn, { v: 1, type: 'SOCIAL_UNSUBSCRIBED' });
+  }
+
+  /** Can this user invite from this room? Must hold a seat. */
+  private canInviteFromRoom(roomCode: string, userId: string): boolean {
+    const room = this.rooms.getRoom(roomCode);
+    if (!room || room.status === 'CLOSED') return false;
+    for (const p of room.players) {
+      if (p.isBot) continue;
+      for (const conn of this.conns.values()) {
+        if (conn.roomCode === roomCode && conn.playerId === p.playerId && conn.userId === userId) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private checkRoomJoinable(roomCode: string): { ok: true } | { ok: false; code: string; message: string } {
+    const room = this.rooms.getRoom(roomCode);
+    if (!room || room.status === 'CLOSED') {
+      return { ok: false, code: 'ROOM_NOT_FOUND', message: 'Room no longer exists.' };
+    }
+    if (room.status !== 'WAITING') {
+      return { ok: false, code: 'GAME_ALREADY_STARTED', message: 'This game has already started.' };
+    }
+    const humans = room.players.filter((p) => !p.isBot).length;
+    if (humans >= room.roomSize) {
+      return { ok: false, code: 'ROOM_FULL', message: 'This room is full.' };
+    }
+    return { ok: true };
+  }
+
   private matchError(conn: Conn, code: string, message: string): void {
     this.send(conn, { v: 1, type: 'MATCH_ERROR', code, message });
   }
@@ -830,6 +1009,15 @@ export class IsleforgeServer {
     });
     this.games.set(room.code, game);
     this.rooms.markGameStarted(room.code, gameId);
+    // M9: presence → IN_GAME for seated users.
+    for (const p of room.players) {
+      if (p.isBot) continue;
+      for (const conn of this.conns.values()) {
+        if (conn.roomCode === room.code && conn.playerId === p.playerId && conn.userId) {
+          this.presence.setInGame(conn.userId, gameMode === 'RANKED' ? 'RANKED' : gameMode === 'CASUAL' ? 'CASUAL' : 'PRIVATE');
+        }
+      }
+    }
 
     // M6: persist the game record + seat roster (idempotent; no-op without DB).
     // M8: gameMode distinguishes CASUAL vs RANKED.
@@ -1010,6 +1198,15 @@ export class IsleforgeServer {
       this.broadcastRoomState(room.code);
       // M6: persist the completed game (idempotent; async, never blocks play).
       this.persistGameEnd(room.code);
+      // M9: presence back to ONLINE for seated users.
+      for (const p of room.players) {
+        if (p.isBot) continue;
+        for (const conn of this.conns.values()) {
+          if (conn.roomCode === room.code && conn.playerId === p.playerId && conn.userId) {
+            this.presence.setInGame(conn.userId, null);
+          }
+        }
+      }
     }
   }
 

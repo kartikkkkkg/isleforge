@@ -68,6 +68,9 @@ const FRIENDLY_SERVER_ERRORS: Record<ErrorCode, string> = {
   NAME_TAKEN: 'That name is taken in this room.',
   DUPLICATE_COMMAND: 'Command already sent.',
   INTERNAL_ERROR: 'Something went wrong.',
+  NOT_AUTHENTICATED: 'Please sign in first.',
+  INVITE_EXPIRED: 'This invitation has expired.',
+  INVITE_NOT_FOUND: 'Invitation not found.',
 };
 
 export function serverFriendlyError(code: ErrorCode, fallback: string): string {
