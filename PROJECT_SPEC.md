@@ -56,6 +56,30 @@ Delivered:
   connection indicator, chat wired into `ChatPanel`
 - no public matchmaking, accounts, or production deployment (later milestones)
 
+## Milestone 6 — Game history & player statistics ✅ COMPLETE (2026-10-09)
+
+The engine remains authoritative for gameplay; the database records the outcome.
+
+Delivered:
+
+- migration `002_game_history`: `games`, `game_players`, `game_events`,
+  `player_game_stats` (+ indexes); never modifies 001
+- `GameRecorder`: on game start persists game + seat roster; on `GAME_ENDED`
+  derives standings from engine state and persists game + players + ordered
+  events + per-user stats in one transaction — idempotent, atomic
+- display-name snapshots (history survives renames); AI seats store
+  difficulty/personality; guests persist with `user_id NULL`
+- history API: `GET /games` (cursor pagination), `GET /games/:id`,
+  `GET /games/:id/events`, `GET /me/stats` — participants only, 404 for others
+- statistics: games/wins/losses/win rate/avg VP/avg finish/best VP/total time,
+  from completed games only (abandoned excluded, no NaN)
+- web UI: Match History (filters, pagination), Game Detail (standings, AI
+  badges), Profile statistics grid; "Watch Replay" disabled until M8
+- server restart safe: duplicate `GAME_ENDED` cannot duplicate records
+
+Full design: `GAME_HISTORY_ARCHITECTURE.md`. Out of scope (later): MMR,
+ranked, leaderboards, matchmaking, friends, achievements, seasons.
+
 ## Milestone 5 — Authentication & persistent accounts ✅ COMPLETE (2026-10-09)
 
 Identity (`User`) is separate from game participation. `packages/db`

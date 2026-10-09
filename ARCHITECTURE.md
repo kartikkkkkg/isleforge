@@ -63,6 +63,17 @@ Passwords use scrypt; sessions are short-lived JWT access tokens + rotating
 opaque refresh tokens (HttpOnly cookie) with reuse detection. Guests keep
 working as in M4. Full design: `AUTH_ARCHITECTURE.md`.
 
+## Game history (M6)
+
+The engine stays authoritative; PostgreSQL records outcomes. `GameRecorder`
+(`apps/server/src/history/`) persists game start/end: on `GAME_ENDED` it
+derives standings from engine state (`victoryPoints()`, sorted by total VP)
+and writes game + players + ordered engine events + per-user stats in one
+transaction — idempotent via status-gated `COMPLETED` transition and
+`ON CONFLICT DO NOTHING`. History API: `GET /games` (cursor pagination),
+`GET /games/:id`, `GET /games/:id/events`, `GET /me/stats` — participants
+only. Full design: `GAME_HISTORY_ARCHITECTURE.md`.
+
 ## Engine module map
 
 | Module | Responsibility |

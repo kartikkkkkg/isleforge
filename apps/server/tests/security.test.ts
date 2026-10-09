@@ -8,7 +8,7 @@ import type { ServerMessage } from '@isleforge/protocol';
 
 import { IsleforgeServer } from '../src/server.js';
 import { randomUUID, serverUrl, startServer, TestClient } from './helpers.js';
-import { readyAndStart, setupLobby } from './integration.test.js';
+import { readyAndStart, setupLobby } from './bot-driver.js';
 
 describe('security', () => {
   let server: IsleforgeServer;

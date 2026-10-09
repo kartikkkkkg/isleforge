@@ -147,3 +147,16 @@ npm run e2e         # Playwright: critical flows (desktop + mobile viewports)
   malformed/oversized bodies, refresh-token replay → family revocation,
   forged user ids impossible (no userId parameter), audit log contains no
   secrets, login rate limiting, password-reset enumeration resistance.
+
+## Game history testing (M6)
+
+- **Database** (`packages/db/tests/games.test.ts`, 7 tests): game creation,
+  idempotent player inserts, idempotent completion, ordered events, stats
+  fixtures (3 games → 2 wins/1 loss), zero-game stats (no NaN), cursor
+  pagination, abandoned games excluded.
+- **History API** (`apps/server/tests/history.test.ts`, 7 tests): auth
+  required, cursor pagination, invalid cursor/limit clamping, participant-only
+  detail/events (404 for others), stats endpoint, SQL injection resistance.
+- **Integration** (`tests/history-integration.test.ts`): 2 authenticated humans
+  + 1 server AI play a full game → `GAME_ENDED` → DB has game/players/events/
+  stats → history API lists it → exactly one game row.

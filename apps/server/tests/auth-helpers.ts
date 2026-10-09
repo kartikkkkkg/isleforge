@@ -50,6 +50,8 @@ export async function setupAuthTest(): Promise<AuthTestContext> {
       auth_register: { windowMs: 60_000, max: 1000 },
       auth_login: { windowMs: 60_000, max: 1000 },
       auth_refresh: { windowMs: 60_000, max: 1000 },
+      // Bot-driven integration tests act far faster than humans.
+      command: { windowMs: 10_000, max: 1000 },
     },
   });
   await server.start();

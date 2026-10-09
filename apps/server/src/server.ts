@@ -31,6 +31,8 @@ import { ServerGame, maskEventForViewer, type AiSeatConfig } from './game.js';
 import { AuthService, type AuthConfig } from './auth/service.js';
 import { createAuthRouter } from './auth/http.js';
 import { verifyAccessToken } from './auth/tokens.js';
+import { createHistoryRouter } from './history/http.js';
+import { GameRecorder, type RecorderSeat } from './history/recorder.js';
 import { getPool, migrate } from '@isleforge/db';
 import type { Pool } from 'pg';
 
@@ -95,6 +97,9 @@ export class IsleforgeServer {
   private authService: AuthService | null = null;
   private authRouter: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
   private authSecret: string | null = null;
+  /** M6: game history recorder. Present when a DB pool is available. */
+  private recorder: GameRecorder | null = null;
+  private historyRouter: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
 
   constructor(private opts: ServerOptions) {
     this.graceMs = opts.reconnectGraceMs ?? DEFAULT_GRACE_MS;
@@ -121,6 +126,16 @@ export class IsleforgeServer {
       }
       this.authService = new AuthService(this.dbPool, this.opts.auth);
       this.authSecret = secret;
+      // M6: game history uses the same pool.
+      this.recorder = new GameRecorder(this.dbPool);
+      this.historyRouter = createHistoryRouter({
+        recorder: this.recorder,
+        verifyToken: (token) => {
+          const payload = verifyAccessToken(secret, token);
+          return payload ? { userId: payload.sub } : null;
+        },
+        checkRateLimit: (key) => this.limiter.check(key, 'auth_profile'),
+      });
       const router = createAuthRouter(this.authService, secret, {
         secureCookies: this.opts.auth.secureCookies ?? false,
         devExposeResetTokens: this.opts.auth.devExposeResetTokens ?? false,
@@ -136,13 +151,19 @@ export class IsleforgeServer {
     }
 
     this.http = createServer((req, res) => {
-      if (this.authRouter) {
-        // Auth routes are async; fire and let them respond.
-        const router = this.authRouter;
-        void router(req, res).then((handled) => {
-          if (!handled) {
-            res.writeHead(200, { 'content-type': 'text/plain' });
-            res.end('isleforge multiplayer server\n');
+      if (this.authRouter || this.historyRouter) {
+        // API routes are async; fire and let them respond.
+        const authRouter = this.authRouter;
+        const historyRouter = this.historyRouter;
+        void (async () => {
+          if (authRouter && (await authRouter(req, res))) return;
+          if (historyRouter && (await historyRouter(req, res))) return;
+          res.writeHead(200, { 'content-type': 'text/plain' });
+          res.end('isleforge multiplayer server\n');
+        })().catch(() => {
+          if (!res.headersSent) {
+            res.writeHead(500, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: 'INTERNAL_ERROR' }));
           }
         });
         return;
@@ -617,6 +638,9 @@ export class IsleforgeServer {
     this.games.set(room.code, game);
     this.rooms.markGameStarted(room.code, gameId);
 
+    // M6: persist the game record + seat roster (idempotent; no-op without DB).
+    this.persistGameStart(room, gameId);
+
     for (const p of room.players) {
       if (p.isBot) continue;
       const target = this.playerConns.get(this.playerKey(room.code, p.playerId));
@@ -633,6 +657,61 @@ export class IsleforgeServer {
       this.broadcastEvents(room.code, game, aiEvents);
       this.snapshotToAll(room.code, game);
     }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* M6: game history persistence                                     */
+  /* ---------------------------------------------------------------- */
+
+  private seatsFor(room: Room): RecorderSeat[] {
+    return room.players.map((p, i) => ({
+      seat: i,
+      playerId: p.playerId,
+      userId: this.sessions.findUserId(room.code, p.playerId),
+      displayName: p.name,
+      playerColor: p.color,
+      isAi: p.isBot,
+      aiDifficulty: p.difficulty ?? null,
+      aiPersonality: p.personality ?? null,
+    }));
+  }
+
+  /** Persist game start + roster. Fire-and-forget; logs on failure. */
+  private persistGameStart(room: Room, gameId: string): void {
+    if (!this.recorder) return;
+    const recorder = this.recorder;
+    void recorder
+      .recordStart({
+        gameId,
+        gameType: 'ONLINE',
+        gameMode: 'CASUAL',
+        mapId: 'archipelago',
+        seats: this.seatsFor(room),
+        startedAt: new Date(),
+      })
+      .catch((e) => console.error('[history] recordStart failed:', (e as Error).message));
+  }
+
+  /** Persist game completion. Idempotent; fire-and-forget; logs on failure. */
+  private persistGameEnd(roomCode: string): void {
+    if (!this.recorder) return;
+    const room = this.rooms.getRoom(roomCode);
+    const game = this.games.get(roomCode);
+    if (!room || !game || !room.gameId) return;
+    const recorder = this.recorder;
+    const gameId = room.gameId;
+    void recorder
+      .recordEnd({
+        gameId,
+        state: game.debugState(),
+        events: game.allEvents(),
+        seats: this.seatsFor(room),
+        finishedAt: new Date(),
+      })
+      .then(({ recorded }) => {
+        if (recorded) console.log(`[history] game ${gameId} persisted`);
+      })
+      .catch((e) => console.error('[history] recordEnd failed:', (e as Error).message));
   }
 
   private onGameCommand(conn: Conn, msg: Extract<ClientMessage, { type: 'GAME_COMMAND' }>): void {
@@ -671,6 +750,8 @@ export class IsleforgeServer {
         reason: 'victory',
       });
       this.broadcastRoomState(room.code);
+      // M6: persist the completed game (idempotent; async, never blocks play).
+      this.persistGameEnd(room.code);
     }
   }
 
@@ -716,6 +797,8 @@ export class IsleforgeServer {
           reason: 'victory',
         });
         this.broadcastRoomState(roomCode);
+        // M6: persist the completed game (idempotent; async, never blocks play).
+        this.persistGameEnd(roomCode);
       }
     }
   }

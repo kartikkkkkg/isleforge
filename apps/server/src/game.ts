@@ -133,6 +133,11 @@ export class ServerGame {
     return this.engine.getEvents().filter((e) => e.seq > seq);
   }
 
+  /** All server-generated engine events, ordered by seq. For persistence. */
+  allEvents(): GameEvent[] {
+    return this.engine.getEvents();
+  }
+
   /** Masked snapshot for one viewer. Never leaks hidden information. */
   snapshotFor(playerId: string): { state: PublicGameState; lastSeq: number } {
     return { state: this.engine.publicView(playerId), lastSeq: this.lastSeq };

@@ -10,7 +10,7 @@ import type { ServerMessage } from '@isleforge/protocol';
 
 import { IsleforgeServer } from '../src/server.js';
 import { serverUrl, startServer, TestClient } from './helpers.js';
-import { BotDriver, readyAndStart, setupLobby } from './integration.test.js';
+import { BotDriver, readyAndStart, setupLobby } from './bot-driver.js';
 
 describe('reconnect', () => {
   let server: IsleforgeServer;

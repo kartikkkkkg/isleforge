@@ -7,6 +7,14 @@ export { UsersRepo, type CreateUserInput } from './repos/users.js';
 export { SessionsRepo, type CreateSessionInput } from './repos/sessions.js';
 export { ResetsRepo } from './repos/resets.js';
 export { AuditRepo, assertNoSecrets, type AuthAuditEvent } from './repos/audit.js';
+export {
+  GamesRepo,
+  type GameRow,
+  type GamePlayerInput,
+  type GamePlayerRow,
+  type PersistedEvent,
+  type PlayerGameStatsInput,
+} from './repos/games.js';
 export type {
   UserRow,
   ProfileRow,

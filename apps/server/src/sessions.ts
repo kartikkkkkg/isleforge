@@ -59,4 +59,12 @@ export class SessionManager {
       }
     }
   }
+
+  /** Authenticated user bound to a seat, or null for guests. */
+  findUserId(roomCode: string, playerId: string): string | null {
+    for (const s of this.sessions.values()) {
+      if (s.roomCode === roomCode && s.playerId === playerId) return s.userId;
+    }
+    return null;
+  }
 }

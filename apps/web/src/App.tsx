@@ -5,6 +5,8 @@ import { OnlineGameFlow } from './screens/OnlineGame';
 import { LoginScreen } from './screens/LoginScreen';
 import { RegisterScreen } from './screens/RegisterScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { MatchHistoryScreen } from './screens/MatchHistoryScreen';
+import { GameDetailScreen } from './screens/GameDetailScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AuthProvider, useAuth } from './game/useAuth';
 import { buildSeats, type AiSetup, type Seat } from './game/useGame';
@@ -27,11 +29,12 @@ const serverUrl = (): string => {
   return new URLSearchParams(window.location.search).get('server') ?? 'ws://localhost:8080';
 };
 
-type Screen = 'menu' | 'login' | 'register' | 'profile' | 'settings';
+type Screen = 'menu' | 'login' | 'register' | 'profile' | 'settings' | 'history' | 'game-detail';
 
 function Shell() {
   const [online, setOnline] = useState(false);
   const [screen, setScreen] = useState<Screen>('menu');
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const { logout } = useAuth();
   const [session, setSession] = useState<Session | null>(() => {
     // Deep-link support: ?autopilot=1[&seed=N][&fast=1] boots straight into a game (E2E + demos).
@@ -92,7 +95,19 @@ function Shell() {
     );
   }
   if (screen === 'profile') {
-    return <ProfileScreen onBack={goMenu} onOpenSettings={() => setScreen('settings')} />;
+    return (
+      <ProfileScreen
+        onBack={goMenu}
+        onOpenSettings={() => setScreen('settings')}
+        onOpenHistory={() => setScreen('history')}
+      />
+    );
+  }
+  if (screen === 'history') {
+    return <MatchHistoryScreen onSelectGame={(id) => { setSelectedGameId(id); setScreen('game-detail'); }} />;
+  }
+  if (screen === 'game-detail' && selectedGameId) {
+    return <GameDetailScreen gameId={selectedGameId} onBack={() => setScreen('history')} />;
   }
   if (screen === 'settings') {
     return <SettingsScreen onBack={goMenu} />;
