@@ -8,6 +8,8 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { MatchHistoryScreen } from './screens/MatchHistoryScreen';
 import { MatchmakingScreen } from './screens/MatchmakingScreen';
 import { MatchmadeGameFlow } from './screens/MatchmadeGame';
+import { ReplayScreen } from './screens/ReplayScreen';
+import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { GameDetailScreen } from './screens/GameDetailScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AuthProvider, useAuth } from './game/useAuth';
@@ -31,13 +33,14 @@ const serverUrl = (): string => {
   return new URLSearchParams(window.location.search).get('server') ?? 'ws://localhost:8080';
 };
 
-type Screen = 'menu' | 'login' | 'register' | 'profile' | 'settings' | 'history' | 'game-detail' | 'matchmaking' | 'matchmade-game';
+type Screen = 'menu' | 'login' | 'register' | 'profile' | 'settings' | 'history' | 'game-detail' | 'matchmaking' | 'matchmade-game' | 'replay' | 'leaderboard';
 
 function Shell() {
   const [online, setOnline] = useState(false);
   const [screen, setScreen] = useState<Screen>('menu');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [matchmadeSessionId, setMatchmadeSessionId] = useState<string | null>(null);
+  const [queueMode, setQueueMode] = useState<'CASUAL' | 'RANKED'>('CASUAL');
   const { logout } = useAuth();
   const [session, setSession] = useState<Session | null>(() => {
     // Deep-link support: ?autopilot=1[&seed=N][&fast=1] boots straight into a game (E2E + demos).
@@ -110,12 +113,28 @@ function Shell() {
     return <MatchHistoryScreen onSelectGame={(id) => { setSelectedGameId(id); setScreen('game-detail'); }} />;
   }
   if (screen === 'game-detail' && selectedGameId) {
-    return <GameDetailScreen gameId={selectedGameId} onBack={() => setScreen('history')} />;
+    return (
+      <GameDetailScreen
+        gameId={selectedGameId}
+        onBack={() => setScreen('history')}
+        onWatchReplay={(id) => {
+          setSelectedGameId(id);
+          setScreen('replay');
+        }}
+      />
+    );
+  }
+  if (screen === 'replay' && selectedGameId) {
+    return <ReplayScreen gameId={selectedGameId} onBack={() => setScreen('game-detail')} />;
+  }
+  if (screen === 'leaderboard') {
+    return <LeaderboardScreen onBack={goMenu} />;
   }
   if (screen === 'matchmaking') {
     return (
       <MatchmakingScreen
         serverUrl={serverUrl()}
+        mode={queueMode}
         onGameStart={({ sessionId }) => {
           setMatchmadeSessionId(sessionId);
           setScreen('matchmade-game');
@@ -141,7 +160,11 @@ function Shell() {
       <MainMenu
         onStart={start}
         onPlayOnline={() => setOnline(true)}
-        onPlayMatchmaking={() => setScreen('matchmaking')}
+        onPlayMatchmaking={(mode) => {
+          setQueueMode(mode);
+          setScreen('matchmaking');
+        }}
+        onLeaderboard={() => setScreen('leaderboard')}
         onSignIn={() => setScreen('login')}
         onRegister={() => setScreen('register')}
         onProfile={() => setScreen('profile')}

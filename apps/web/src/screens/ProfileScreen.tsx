@@ -16,15 +16,29 @@ export function ProfileScreen({
 }) {
   const { user, logout, authFetch } = useAuth();
   const [stats, setStats] = useState<PlayerStats | null>(null);
-  const [rating, setRating] = useState<{ rating: number; gamesRated: number } | null>(null);
+  const [rating, setRating] = useState<{
+    rating: number;
+    gamesRated: number;
+    wins: number;
+    rank: { tier: string; division: number | null; name: string; provisional: boolean; progress: number; nextThreshold: number | null };
+  } | null>(null);
+  const [ratingHistory, setRatingHistory] = useState<{
+    game_id: string;
+    rating_before: number;
+    rating_after: number;
+    rating_delta: number;
+    placement: number;
+    created_at: string;
+  }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [statsRes, ratingRes] = await Promise.all([
+        const [statsRes, ratingRes, histRes] = await Promise.all([
           authFetch('/me/stats'),
           authFetch('/me/rating'),
+          authFetch('/me/rating-history?limit=10'),
         ]);
         if (!cancelled) {
           if (statsRes.ok) {
@@ -32,8 +46,12 @@ export function ProfileScreen({
             setStats(data.stats);
           }
           if (ratingRes.ok) {
-            const data = (await ratingRes.json()) as { rating: number; gamesRated: number };
+            const data = await ratingRes.json();
             setRating(data);
+          }
+          if (histRes.ok) {
+            const data = (await histRes.json()) as { history: typeof ratingHistory };
+            setRatingHistory(data.history);
           }
         }
       } catch {
@@ -102,16 +120,36 @@ export function ProfileScreen({
           </div>
         )}
         {rating && (
-          <div className="if-mmr">
-            <div className="if-stat if-stat--wide">
-              <span className="if-stat__value">{rating.rating.toLocaleString()}</span>
-              <span className="if-stat__label">MMR</span>
+          <>
+            <div className="rank-display">
+              <div className="rank-tier">{rating.rank.name}</div>
+              {!rating.rank.provisional && rating.rank.nextThreshold && (
+                <>
+                  <div className="rank-progress">
+                    <div style={{ width: `${rating.rank.progress * 100}%` }} />
+                  </div>
+                  <div className="muted tiny">
+                    {rating.rating.toLocaleString()} / {rating.rank.nextThreshold.toLocaleString()}
+                  </div>
+                </>
+              )}
+              {rating.rank.provisional && (
+                <div className="muted tiny">
+                  Provisional — {rating.gamesRated} / 10 games
+                </div>
+              )}
             </div>
-            <div className="if-stat if-stat--wide">
-              <span className="if-stat__value">{rating.gamesRated}</span>
-              <span className="if-stat__label">Rated Games</span>
+            <div className="if-mmr">
+              <div className="if-stat if-stat--wide">
+                <span className="if-stat__value">{rating.rating.toLocaleString()}</span>
+                <span className="if-stat__label">MMR</span>
+              </div>
+              <div className="if-stat if-stat--wide">
+                <span className="if-stat__value">{rating.gamesRated}</span>
+                <span className="if-stat__label">Rated Games</span>
+              </div>
             </div>
-          </div>
+          </>
         )}
         <dl className="if-profile__facts">
           <div>
@@ -123,6 +161,25 @@ export function ProfileScreen({
             <dd>{user.emailVerified ? 'Verified' : 'Not verified'}</dd>
           </div>
         </dl>
+        {ratingHistory.length > 0 && (
+          <div className="rating-history">
+            <h3>Rating History</h3>
+            <ul>
+              {ratingHistory.map((h) => (
+                <li key={h.game_id}>
+                  <span>{new Date(h.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                  <span>#{h.placement}</span>
+                  <span>
+                    {h.rating_before} → {h.rating_after}
+                  </span>
+                  <span className={h.rating_delta >= 0 ? 'positive' : 'negative'}>
+                    {h.rating_delta >= 0 ? '+' : ''}{h.rating_delta}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="if-menu__btns">
           <button className="if-btn" onClick={onOpenHistory}>
             Match History

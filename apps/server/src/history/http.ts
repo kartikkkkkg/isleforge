@@ -13,6 +13,32 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { GameRecorder } from './recorder.js';
 import type { GameRow, GamePlayerRow, PersistedEvent, RatingsRepo } from '@isleforge/db';
 
+async function getLeaderboard(
+  deps: HistoryRouterDeps,
+  userId: string,
+  limit: number,
+  before: string | null,
+): Promise<{
+  rows: unknown[];
+  nextCursor: string | null;
+  personalPosition: { position: number; rating: number } | null;
+}> {
+  const { rows, nextCursor } = await deps.ratings!.leaderboard(limit, before);
+  const position = await deps.ratings!.rankPosition(userId);
+  const me = await deps.ratings!.get(userId);
+  // Attach rank tiers (derived, not stored).
+  const { rankFor, rankName } = await import('../rating/rank.js');
+  const withRanks = rows.map((r: { rating: number; gamesRated: number }) => {
+    const rank = rankFor(r.rating, r.gamesRated);
+    return { ...r, rankName: rankName(rank), tier: rank.tier };
+  });
+  return {
+    rows: withRanks,
+    nextCursor,
+    personalPosition: position != null && me ? { position, rating: me.rating } : null,
+  };
+}
+
 export interface HistoryRouterDeps {
   recorder: GameRecorder;
   ratings: RatingsRepo | null;
@@ -47,8 +73,9 @@ export function createHistoryRouter(deps: HistoryRouterDeps) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const path = url.pathname;
+    const params = url.searchParams;
     if (req.method !== 'GET') return false;
-    if (!path.startsWith('/games') && path !== '/me/stats') return false;
+    if (!path.startsWith('/games') && path !== '/me/stats' && path !== '/me/rating' && path !== '/me/rating-history' && path !== '/leaderboard') return false;
 
     const userId = bearerUserId(req, deps.verifyToken);
     if (!userId) {
@@ -76,7 +103,59 @@ export function createHistoryRouter(deps: HistoryRouterDeps) {
         return true;
       }
       const row = await deps.ratings.ensure(userId);
-      json(res, 200, { rating: row.rating, gamesRated: row.games_rated });
+      const { rankFor, rankName } = await import('../rating/rank.js');
+      const rank = rankFor(row.rating, row.games_rated);
+      json(res, 200, {
+        rating: row.rating,
+        gamesRated: row.games_rated,
+        wins: row.wins,
+        rank: {
+          tier: rank.tier,
+          division: rank.division,
+          name: rankName(rank),
+          provisional: rank.provisional,
+          progress: rank.progress,
+          nextThreshold: rank.nextThreshold,
+        },
+      });
+      return true;
+    }
+
+    // GET /me/rating-history
+    if (path === '/me/rating-history') {
+      if (!deps.ratings) {
+        json(res, 503, { error: 'RATINGS_UNAVAILABLE' });
+        return true;
+      }
+      const limit = Math.min(Math.max(parseInt(params.get('limit') ?? '20', 10) || 20, 1), 100);
+      const history = await deps.ratings.historyForUser(userId, limit);
+      json(res, 200, { history });
+      return true;
+    }
+
+    // GET /leaderboard?limit=50&before=<cursor>
+    if (path === '/leaderboard') {
+      if (!deps.ratings) {
+        json(res, 503, { error: 'RATINGS_UNAVAILABLE' });
+        return true;
+      }
+      const limit = Math.min(Math.max(parseInt(params.get('limit') ?? '50', 10) || 50, 1), 100);
+      const before = params.get('before');
+      try {
+        const { rows, nextCursor, personalPosition } = await getLeaderboard(
+          deps,
+          userId,
+          limit,
+          before,
+        );
+        json(res, 200, { leaderboard: rows, nextCursor, personalPosition });
+      } catch (e) {
+        if ((e as Error).message === 'INVALID_CURSOR') {
+          json(res, 400, { error: 'INVALID_CURSOR' });
+        } else {
+          throw e;
+        }
+      }
       return true;
     }
 

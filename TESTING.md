@@ -176,3 +176,13 @@ npm run e2e         # Playwright: critical flows (desktop + mobile viewports)
 - **Simulations** (`scripts/sim-matchmaking.ts`, `scripts/sim-rating.ts`):
   1000 players, 99.6%+ matched, p95 ~13s, 0 duplicates; strong/medium/weak
   rating behavior verified.
+
+## Ranked/leaderboard/replay testing (M8)
+
+- **Rank** (`tests/rank.test.ts`, 7 tests): tiers, divisions, provisional,
+  naming, progress, determinism.
+- **Leaderboard** (`tests/leaderboard.test.ts`, 5 tests): ordering,
+  pagination, personal position, privacy, invalid cursor.
+- **Replay** (`tests/replay.test.ts`, 6 tests): reconstruction, seeking,
+  determinism, dice not rerolled, final state matches.
+- **Simulations**: competitive (1000 players, sane distribution).

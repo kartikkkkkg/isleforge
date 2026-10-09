@@ -6,7 +6,15 @@ import { useAuth } from '../game/useAuth';
 import { Avatar } from '../components/Avatar';
 import { formatDate, formatDuration, type GameDetail } from '../game/history';
 
-export function GameDetailScreen({ gameId, onBack }: { gameId: string; onBack: () => void }) {
+export function GameDetailScreen({
+  gameId,
+  onBack,
+  onWatchReplay,
+}: {
+  gameId: string;
+  onBack: () => void;
+  onWatchReplay: (gameId: string) => void;
+}) {
   const { authFetch } = useAuth();
   const [detail, setDetail] = useState<GameDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,8 +74,8 @@ export function GameDetailScreen({ gameId, onBack }: { gameId: string; onBack: (
           </li>
         ))}
       </ol>
-      <button className="secondary" disabled title="Replay viewing ships in M8">
-        Watch Replay (coming in M8)
+      <button className="secondary" onClick={() => onWatchReplay(game.id)}>
+        Watch Replay
       </button>
       <p className="muted tiny">Game ID: {game.id}</p>
     </div>

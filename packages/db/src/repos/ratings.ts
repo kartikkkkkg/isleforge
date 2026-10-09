@@ -104,4 +104,77 @@ export class RatingsRepo {
     );
     return rows;
   }
+
+  /**
+   * Global ranked leaderboard: rating DESC, gamesRated DESC, user_id ASC.
+   * Cursor is base64url { rating, gamesRated, userId }.
+   */
+  async leaderboard(limit: number, before?: string | null): Promise<{
+    rows: {
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarId: string;
+      rating: number;
+      gamesRated: number;
+      wins: number;
+    }[];
+    nextCursor: string | null;
+  }> {
+    let cursor: { rating: number; gamesRated: number; userId: string } | null = null;
+    if (before) {
+      try {
+        cursor = JSON.parse(Buffer.from(before, 'base64url').toString('utf8'));
+      } catch {
+        throw new Error('INVALID_CURSOR');
+      }
+      if (
+        typeof cursor?.rating !== 'number' ||
+        typeof cursor?.gamesRated !== 'number' ||
+        typeof cursor?.userId !== 'string'
+      ) {
+        throw new Error('INVALID_CURSOR');
+      }
+    }
+
+    const params: unknown[] = [limit + 1];
+    let where = '';
+    if (cursor) {
+      where = `WHERE (pr.rating, pr.games_rated, pr.user_id) < ($2, $3, $4)`;
+      params.push(cursor.rating, cursor.gamesRated, cursor.userId);
+    }
+    const { rows } = await this.db.query(
+      `SELECT pr.user_id AS "userId", u.username, p.display_name AS "displayName",
+              p.avatar_id AS "avatarId", pr.rating, pr.games_rated AS "gamesRated",
+              pr.wins
+       FROM player_ratings pr
+       JOIN users u ON u.id = pr.user_id
+       JOIN account_profiles p ON p.user_id = pr.user_id
+       ${where}
+       ORDER BY pr.rating DESC, pr.games_rated DESC, pr.user_id ASC
+       LIMIT $1`,
+      params,
+    );
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const last = page[page.length - 1];
+    const nextCursor = hasMore && last
+      ? Buffer.from(
+          JSON.stringify({ rating: last.rating, gamesRated: last.gamesRated, userId: last.userId }),
+        ).toString('base64url')
+      : null;
+    return { rows: page, nextCursor };
+  }
+
+  /** 1-based rank position of a user (efficient COUNT query). */
+  async rankPosition(userId: string): Promise<number | null> {
+    const me = await this.get(userId);
+    if (!me) return null;
+    const { rows } = await this.db.query(
+      `SELECT COUNT(*)::int AS n FROM player_ratings
+       WHERE (rating, games_rated, user_id) > ($1, $2, $3)`,
+      [me.rating, me.games_rated, userId],
+    );
+    return rows[0].n + 1;
+  }
 }

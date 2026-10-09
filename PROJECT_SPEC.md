@@ -56,6 +56,27 @@ Delivered:
   connection indicator, chat wired into `ChatPanel`
 - no public matchmaking, accounts, or production deployment (later milestones)
 
+## Milestone 8 — Ranked + leaderboards + replays ✅ COMPLETE (2026-10-09)
+
+Competitive layer on top of M7.
+
+Delivered:
+
+- RankService: 7 tiers (Bronze→Grandmaster), divisions, provisional (<10 games),
+  thresholds validated by simulation
+- ranked matchmaking: `matchMode=RANKED`, tighter windows (±75→300),
+  casual/ranked queue separation
+- `game_mode=RANKED` persisted; same Elo system (rating ≠ rank)
+- leaderboard: `GET /leaderboard` (cursor pagination), personal position,
+  privacy-safe fields, UI with responsive cards
+- replay viewer: reconstructs from `game_events` via `replayEvents()`,
+  play/pause/step/speed/timeline, read-only, reuses GameBoard
+- profile: rank display with progress bar, rating history, MMR
+- game result: rating deltas shown (server-authoritative)
+
+Docs: `RANKED_ARCHITECTURE.md`, `LEADERBOARD_ARCHITECTURE.md`, `REPLAY_ARCHITECTURE.md`.
+Out of scope (later): seasons, tournaments, friends, leaver penalties.
+
 ## Milestone 7 — MMR + casual matchmaking ✅ COMPLETE (2026-10-09)
 
 Authenticated players click Quick Match and are automatically matched.

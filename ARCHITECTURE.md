@@ -154,3 +154,12 @@ On match: matchmade room (`match_type = MATCHMADE`) + normal `ServerGame`,
 auto-start, clients reconnect via session. Ratings: multiplayer Elo
 (`apps/server/src/rating/elo.ts`), updated transactionally at game end.
 Full design: `MATCHMAKING_ARCHITECTURE.md`, `RATING_SYSTEM.md`.
+
+## Ranked + leaderboards + replays (M8)
+
+RankService derives tiers (Bronze→Grandmaster) from MMR deterministically.
+Ranked matchmaking reuses the M7 Matchmaker with `matchMode=RANKED` and
+tighter windows. Leaderboard: `GET /leaderboard` (cursor pagination).
+Replay: `replayEvents()` reconstructs state from persisted events; read-only
+viewer reuses GameBoard. Docs: `RANKED_ARCHITECTURE.md`,
+`LEADERBOARD_ARCHITECTURE.md`, `REPLAY_ARCHITECTURE.md`.

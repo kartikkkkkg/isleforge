@@ -345,8 +345,13 @@ export function parseClientMessage(data: unknown, byteLength?: number): ParseRes
       }
       return { ok: true, message: { v: 1, type: 'AUTHENTICATE', accessToken: data['accessToken'] } };
     }
-    case 'QUEUE_JOIN':
-      return { ok: true, message: { v: 1, type: 'QUEUE_JOIN' } };
+    case 'QUEUE_JOIN': {
+      const mode = data['mode'];
+      if (mode !== undefined && mode !== 'CASUAL' && mode !== 'RANKED') {
+        return fail('INVALID_MESSAGE', 'QUEUE_JOIN mode must be CASUAL or RANKED.');
+      }
+      return { ok: true, message: { v: 1, type: 'QUEUE_JOIN', ...(mode ? { mode } : {}) } };
+    }
     case 'QUEUE_LEAVE':
       return { ok: true, message: { v: 1, type: 'QUEUE_LEAVE' } };
     case 'QUEUE_STATUS':

@@ -146,7 +146,7 @@ export type ClientMessage =
   | { v: 1; type: 'RECONNECT'; sessionId: string; lastSeq?: number }
   | { v: 1; type: 'GAME_CHAT'; text: string }
   | { v: 1; type: 'AUTHENTICATE'; accessToken: string }
-  | { v: 1; type: 'QUEUE_JOIN' }
+  | { v: 1; type: 'QUEUE_JOIN'; mode?: 'CASUAL' | 'RANKED' }
   | { v: 1; type: 'QUEUE_LEAVE' }
   | { v: 1; type: 'QUEUE_STATUS' };
 
@@ -207,12 +207,13 @@ export type ServerMessage =
     }
   | { v: 1; type: 'GAME_ENDED'; winnerId: string | null; reason: string }
   | { v: 1; type: 'AUTHENTICATED'; userId: string }
-  | { v: 1; type: 'QUEUE_JOINED'; queuedAt: number }
+  | { v: 1; type: 'QUEUE_JOINED'; queuedAt: number; mode: 'CASUAL' | 'RANKED' }
   | {
       v: 1;
       type: 'QUEUE_STATUS';
       status: 'QUEUED' | 'NOT_QUEUED';
       queuedAt: number | null;
+      mode: 'CASUAL' | 'RANKED' | null;
       playersSearching: number;
       estimatedWaitMs: number;
     }
@@ -220,6 +221,7 @@ export type ServerMessage =
   | {
       v: 1;
       type: 'MATCH_FOUND';
+      mode: 'CASUAL' | 'RANKED';
       players: { userId: string; displayName: string }[];
     }
   | { v: 1; type: 'MATCH_STARTING'; roomCode: string; sessionId: string; playerId: string }

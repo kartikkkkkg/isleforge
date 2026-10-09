@@ -13,7 +13,7 @@ export interface QueueEntry {
   userId: string;
   rating: number;
   queuedAt: number;
-  gameMode: 'CASUAL';
+  gameMode: 'CASUAL' | 'RANKED';
   /** Connection ids currently watching this queue entry (multi-tab). */
   connIds: Set<string>;
 }
@@ -40,6 +40,7 @@ export const DEFAULT_MATCHMAKING_CONFIG: MatchmakingConfig = {
 
 export interface FormedMatch {
   userIds: string[];
+  gameMode: 'CASUAL' | 'RANKED';
 }
 
 export class Matchmaker {
@@ -102,12 +103,21 @@ export class Matchmaker {
     return this.queue.get(userId);
   }
 
-  /** Rating window for a wait time in ms. */
-  ratingRange(waitMs: number): number {
-    for (const [maxWait, range] of this.config.ratingWindows) {
+  /** Rating window for a wait time in ms. Ranked uses tighter windows. */
+  ratingRange(waitMs: number, gameMode: 'CASUAL' | 'RANKED' = 'CASUAL'): number {
+    const windows: [number, number][] =
+      gameMode === 'RANKED'
+        ? [
+            [30_000, 75],
+            [60_000, 120],
+            [120_000, 200],
+            [Number.POSITIVE_INFINITY, 300],
+          ]
+        : this.config.ratingWindows;
+    for (const [maxWait, range] of windows) {
       if (waitMs <= maxWait) return range;
     }
-    return this.config.ratingWindows[this.config.ratingWindows.length - 1]![1];
+    return windows[windows.length - 1]![1];
   }
 
   /** Estimated wait: heuristic from queue size and recent match times. */
@@ -135,7 +145,10 @@ export class Matchmaker {
           used.add(u.userId);
           this.queue.delete(u.userId);
         }
-        const match: FormedMatch = { userIds: group.map((g) => g.userId) };
+        const match: FormedMatch = {
+          userIds: group.map((g) => g.userId),
+          gameMode: entry.gameMode,
+        };
         formed.push(match);
         this.recentMatchTimes.push(now - entry.queuedAt);
         if (this.recentMatchTimes.length > 20) this.recentMatchTimes.shift();
@@ -149,7 +162,7 @@ export class Matchmaker {
   /**
    * Find a compatible group for `entry`. Candidates must be within the
    * *mutual* rating window (both players' ranges), preferring closest rating
-   * among those waiting longest.
+   * among those waiting longest. Only same gameMode (casual/ranked) match.
    */
   private findGroup(
     entry: QueueEntry,
@@ -158,13 +171,14 @@ export class Matchmaker {
     now: number,
   ): QueueEntry[] {
     const group: QueueEntry[] = [entry];
-    const entryRange = this.ratingRange(now - entry.queuedAt);
+    const entryRange = this.ratingRange(now - entry.queuedAt, entry.gameMode);
 
     // Candidates sorted by wait time (oldest first), then rating proximity.
     const candidates = entries
       .filter((e) => e.userId !== entry.userId && !used.has(e.userId))
+      .filter((e) => e.gameMode === entry.gameMode)
       .filter((e) => {
-        const range = this.ratingRange(now - e.queuedAt);
+        const range = this.ratingRange(now - e.queuedAt, e.gameMode);
         const diff = Math.abs(e.rating - entry.rating);
         return diff <= entryRange && diff <= range;
       })
@@ -174,10 +188,10 @@ export class Matchmaker {
       if (group.length >= this.config.matchSize) break;
       // Ensure the candidate is compatible with everyone already in the group.
       const ok = group.every((g) => {
-        const gr = this.ratingRange(now - g.queuedAt);
-        const cr = this.ratingRange(now - c.queuedAt);
+        const gr = this.ratingRange(now - g.queuedAt, g.gameMode);
+        const cr = this.ratingRange(now - c.queuedAt, c.gameMode);
         const diff = Math.abs(g.rating - c.rating);
-        return diff <= gr && diff <= cr;
+        return diff <= gr && diff <= cr && g.gameMode === c.gameMode;
       });
       if (ok) group.push(c);
     }

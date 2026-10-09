@@ -13,10 +13,12 @@ interface MatchPlayer {
 
 export function MatchmakingScreen({
   serverUrl,
+  mode,
   onGameStart,
   onCancel,
 }: {
   serverUrl: string;
+  mode: 'CASUAL' | 'RANKED';
   onGameStart: (game: { gameId: string; playerId: string; sessionId: string }) => void;
   onCancel: () => void;
 }) {
@@ -51,7 +53,7 @@ export function MatchmakingScreen({
       }
       switch (msg.type) {
         case 'AUTHENTICATED':
-          ws.send(JSON.stringify({ v: 1, type: 'QUEUE_JOIN' }));
+          ws.send(JSON.stringify({ v: 1, type: 'QUEUE_JOIN', mode }));
           break;
         case 'QUEUE_JOINED':
           ws.send(JSON.stringify({ v: 1, type: 'QUEUE_STATUS' }));
@@ -111,7 +113,7 @@ export function MatchmakingScreen({
       ws.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverUrl]);
+  }, [serverUrl, mode]);
 
   const cancel = () => {
     try {
@@ -124,6 +126,7 @@ export function MatchmakingScreen({
 
   return (
     <div className="screen matchmaking-screen">
+      <div className="mode-badge">{mode === 'RANKED' ? 'RANKED' : 'CASUAL'}</div>
       {phase === 'queuing' && (
         <>
           <h1>Finding players…</h1>
@@ -147,7 +150,7 @@ export function MatchmakingScreen({
       )}
       {phase === 'found' && (
         <>
-          <h1>Match found!</h1>
+          <h1>{mode === 'RANKED' ? 'Ranked match found!' : 'Match found!'}</h1>
           <ul className="match-players">
             {matchPlayers.map((p) => (
               <li key={p.userId}>{p.displayName}</li>

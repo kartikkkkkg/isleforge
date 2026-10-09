@@ -16,7 +16,8 @@ interface MainMenuProps {
     ai: AiSetup;
   }) => void;
   onPlayOnline: () => void;
-  onPlayMatchmaking: () => void;
+  onPlayMatchmaking: (mode: 'CASUAL' | 'RANKED') => void;
+  onLeaderboard: () => void;
   onSignIn: () => void;
   onRegister: () => void;
   onProfile: () => void;
@@ -75,6 +76,7 @@ export function MainMenu({
   onStart,
   onPlayOnline,
   onPlayMatchmaking,
+  onLeaderboard,
   onSignIn,
   onRegister,
   onProfile,
@@ -167,12 +169,20 @@ export function MainMenu({
                 Play Online
               </button>
               {user && (
-                <button className="if-btn if-btn--primary if-btn--lg" onClick={onPlayMatchmaking}>
-                  ⚡ Quick Match
-                </button>
+                <>
+                  <button className="if-btn if-btn--primary if-btn--lg" onClick={() => onPlayMatchmaking('CASUAL')}>
+                    ⚡ Quick Match
+                  </button>
+                  <button className="if-btn if-btn--primary if-btn--lg" onClick={() => onPlayMatchmaking('RANKED')}>
+                    🏆 Ranked
+                  </button>
+                </>
               )}
               <button className="if-btn if-btn--ghost" onClick={onProfile}>
                 Profile
+              </button>
+              <button className="if-btn if-btn--ghost" onClick={onLeaderboard}>
+                Leaderboard
               </button>
               <button className="if-btn if-btn--ghost" onClick={onSettings}>
                 Settings

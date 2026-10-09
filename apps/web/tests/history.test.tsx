@@ -112,7 +112,7 @@ describe('history UI', () => {
       }),
     });
     mockUseAuth.mockReturnValue(authState({ authFetch }));
-    render(<GameDetailScreen gameId="g1" onBack={vi.fn()} />);
+    render(<GameDetailScreen gameId="g1" onBack={vi.fn()} onWatchReplay={vi.fn()} />);
     await waitFor(() => expect(screen.getByText('Captain')).not.toBeNull());
     expect(screen.getByText('Bot')).not.toBeNull();
     expect(screen.getByText(/AI · hard/)).not.toBeNull();
@@ -123,7 +123,7 @@ describe('history UI', () => {
   it('handles game detail 404', async () => {
     const authFetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
     mockUseAuth.mockReturnValue(authState({ authFetch }));
-    render(<GameDetailScreen gameId="nope" onBack={vi.fn()} />);
+    render(<GameDetailScreen gameId="nope" onBack={vi.fn()} onWatchReplay={vi.fn()} />);
     await waitFor(() => expect(screen.getByText('Game not found.')).not.toBeNull());
   });
 });

@@ -134,6 +134,9 @@ export class IsleforgeServer {
       this.authSecret = secret;
       // M6: game history uses the same pool.
       this.recorder = new GameRecorder(this.dbPool);
+      // M7: ratings (created before history router so deps are ready).
+      this.ratingsRepo = new RatingsRepo(this.dbPool);
+      this.usersRepo = new UsersRepo(this.dbPool);
       this.historyRouter = createHistoryRouter({
         recorder: this.recorder,
         ratings: this.ratingsRepo,
@@ -143,9 +146,7 @@ export class IsleforgeServer {
         },
         checkRateLimit: (key) => this.limiter.check(key, 'auth_profile'),
       });
-      // M7: matchmaking + ratings use the same pool.
-      this.ratingsRepo = new RatingsRepo(this.dbPool);
-      this.usersRepo = new UsersRepo(this.dbPool);
+      // M7: matchmaking uses the same pool.
       this.matchmaker = new Matchmaker(DEFAULT_MATCHMAKING_CONFIG, (m) => this.onMatchFound(m));
       this.matchmaker.start();
       const router = createAuthRouter(this.authService, secret, {
@@ -389,7 +390,7 @@ export class IsleforgeServer {
         void this.onAuthenticate(conn, msg);
         break;
       case 'QUEUE_JOIN':
-        void this.onQueueJoin(conn);
+        void this.onQueueJoin(conn, msg);
         break;
       case 'QUEUE_LEAVE':
         this.onQueueLeave(conn);
@@ -654,7 +655,7 @@ export class IsleforgeServer {
     this.send(conn, { v: 1, type: 'MATCH_ERROR', code, message });
   }
 
-  private async onQueueJoin(conn: Conn): Promise<void> {
+  private async onQueueJoin(conn: Conn, msg: Extract<ClientMessage, { type: 'QUEUE_JOIN' }>): Promise<void> {
     if (!this.matchmaker || !this.ratingsRepo || !this.usersRepo) {
       this.matchError(conn, 'MATCHMAKING_UNAVAILABLE', 'Matchmaking is not enabled on this server.');
       return;
@@ -672,7 +673,8 @@ export class IsleforgeServer {
       return;
     }
     const userId = conn.userId;
-    // One queue entry per user (multi-tab safe).
+    const mode = msg.mode ?? 'CASUAL';
+    // One queue entry per user across both queues.
     if (this.matchmaker.getEntry(userId)) {
       this.matchError(conn, 'ALREADY_QUEUED', 'You are already in the queue.');
       return;
@@ -684,7 +686,7 @@ export class IsleforgeServer {
       userId,
       rating: rating.rating,
       queuedAt: Date.now(),
-      gameMode: 'CASUAL',
+      gameMode: mode,
       connId: conn.id,
     });
     if (!joined) {
@@ -694,7 +696,7 @@ export class IsleforgeServer {
     // Stash the display name for MATCH_FOUND (not trusted from the client).
     const entry = this.matchmaker.getEntry(userId);
     if (entry) (entry as { displayName?: string }).displayName = displayName;
-    this.send(conn, { v: 1, type: 'QUEUE_JOINED', queuedAt: entry!.queuedAt });
+    this.send(conn, { v: 1, type: 'QUEUE_JOINED', queuedAt: entry!.queuedAt, mode });
   }
 
   private onQueueLeave(conn: Conn): void {
@@ -713,6 +715,7 @@ export class IsleforgeServer {
       type: 'QUEUE_STATUS',
       status: entry ? 'QUEUED' : 'NOT_QUEUED',
       queuedAt: entry?.queuedAt ?? null,
+      mode: entry?.gameMode ?? null,
       playersSearching: this.matchmaker.size,
       estimatedWaitMs: this.matchmaker.estimatedWaitMs(),
     });
@@ -784,7 +787,7 @@ export class IsleforgeServer {
     const names = participants.map((p) => ({ userId: p.userId, displayName: p.displayName }));
     for (const p of participants) {
       for (const c of p.conns) {
-        this.send(c, { v: 1, type: 'MATCH_FOUND', players: names });
+        this.send(c, { v: 1, type: 'MATCH_FOUND', mode: match.gameMode, players: names });
       }
     }
 
@@ -801,14 +804,14 @@ export class IsleforgeServer {
         });
       }
     }
-    this.beginGame(room);
+    this.beginGame(room, match.gameMode);
   }
 
   /**
    * Start the engine game for a room. Extracted from onStartGame so
    * matchmaking can reuse it.
    */
-  private beginGame(room: Room): void {
+  private beginGame(room: Room, gameMode: 'CASUAL' | 'RANKED' = 'CASUAL'): void {
     const gameId = `g${randomBytes(8).toString('hex')}`;
     const aiSeats = new Map<string, AiSeatConfig>();
     for (const p of room.players) {
@@ -829,7 +832,8 @@ export class IsleforgeServer {
     this.rooms.markGameStarted(room.code, gameId);
 
     // M6: persist the game record + seat roster (idempotent; no-op without DB).
-    this.persistGameStart(room, gameId);
+    // M8: gameMode distinguishes CASUAL vs RANKED.
+    this.persistGameStart(room, gameId, gameMode);
 
     for (const p of room.players) {
       if (p.isBot) continue;
@@ -864,14 +868,14 @@ export class IsleforgeServer {
   }
 
   /** Persist game start + roster. Fire-and-forget; logs on failure. */
-  private persistGameStart(room: Room, gameId: string): void {
+  private persistGameStart(room: Room, gameId: string, gameMode: 'CASUAL' | 'RANKED' = 'CASUAL'): void {
     if (!this.recorder) return;
     const recorder = this.recorder;
     void recorder
       .recordStart({
         gameId,
         gameType: 'ONLINE',
-        gameMode: 'CASUAL',
+        gameMode,
         mapId: 'archipelago',
         matchType: (room as { matchType?: string }).matchType === 'MATCHMADE' ? 'MATCHMADE' : 'PRIVATE',
         seats: this.seatsFor(room),
